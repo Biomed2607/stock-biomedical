@@ -7,7 +7,6 @@ import { Client, Databases, ID, Query } from 'https://cdn.jsdelivr.net/npm/appwr
 const APPWRITE_ENDPOINT = 'https://cloud.appwrite.io/v1';
 const APPWRITE_PROJECT_ID = '69f1d5220033c670e25a';
 
-// Si erreur database_not_found, copie l'ID exact depuis Appwrite > Database > Paramètres
 const DATABASE_ID = 'base de données biomédicales de stock';
 
 const COLLECTIONS = {
@@ -16,7 +15,6 @@ const COLLECTIONS = {
   movements: 'mouvements_stock'
 };
 
-// Cette valeur doit exister dans ton enum Appwrite "category"
 const DEFAULT_CATEGORY = 'Consommable';
 
 const client = new Client()
@@ -101,14 +99,14 @@ Cordialement.`
 // ==============================
 
 async function listItems() {
-  const response = await databases.listDocuments({
-    databaseId: DATABASE_ID,
-    collectionId: COLLECTIONS.items,
-    queries: [
+  const response = await databases.listDocuments(
+    DATABASE_ID,
+    COLLECTIONS.items,
+    [
       Query.orderAsc('itemName'),
       Query.limit(100)
     ]
-  });
+  );
 
   return response.documents || [];
 }
@@ -117,38 +115,38 @@ async function findOrCreateSupplier({ supplier, contact, email, notes }) {
   const cleanSupplier = supplier.trim();
   const cleanEmail = email.trim();
 
-  const existing = await databases.listDocuments({
-    databaseId: DATABASE_ID,
-    collectionId: COLLECTIONS.suppliers,
-    queries: [
+  const existing = await databases.listDocuments(
+    DATABASE_ID,
+    COLLECTIONS.suppliers,
+    [
       Query.equal('email', [cleanEmail]),
       Query.limit(1)
     ]
-  });
+  );
 
   const found = existing.documents || [];
 
   if (found.length > 0) {
     const supplierDoc = found[0];
 
-    return databases.updateDocument({
-      databaseId: DATABASE_ID,
-      collectionId: COLLECTIONS.suppliers,
-      documentId: supplierDoc.$id,
-      data: {
+    return databases.updateDocument(
+      DATABASE_ID,
+      COLLECTIONS.suppliers,
+      supplierDoc.$id,
+      {
         nom: cleanSupplier,
         contact: contact.trim() || null,
         email: cleanEmail,
         notes: notes.trim() || null
       }
-    });
+    );
   }
 
-  return databases.createDocument({
-    databaseId: DATABASE_ID,
-    collectionId: COLLECTIONS.suppliers,
-    documentId: ID.unique(),
-    data: {
+  return databases.createDocument(
+    DATABASE_ID,
+    COLLECTIONS.suppliers,
+    ID.unique(),
+    {
       nom: cleanSupplier,
       contact: contact.trim() || null,
       email: cleanEmail,
@@ -156,7 +154,7 @@ async function findOrCreateSupplier({ supplier, contact, email, notes }) {
       adresse: null,
       notes: notes.trim() || null
     }
-  });
+  );
 }
 
 // ==============================
@@ -273,20 +271,20 @@ function initStockPage() {
       : oldQuantity - movementQty;
 
     try {
-      await databases.updateDocument({
-        databaseId: DATABASE_ID,
-        collectionId: COLLECTIONS.items,
-        documentId: item.$id,
-        data: {
+      await databases.updateDocument(
+        DATABASE_ID,
+        COLLECTIONS.items,
+        item.$id,
+        {
           stockQuantity: newQuantity
         }
-      });
+      );
 
-      await databases.createDocument({
-        databaseId: DATABASE_ID,
-        collectionId: COLLECTIONS.movements,
-        documentId: ID.unique(),
-        data: {
+      await databases.createDocument(
+        DATABASE_ID,
+        COLLECTIONS.movements,
+        ID.unique(),
+        {
           itemId: item.$id,
           itemCode: item.itemCode,
           itemName: item.itemName,
@@ -298,7 +296,7 @@ function initStockPage() {
           comment: '',
           user: 'Utilisateur web'
         }
-      });
+      );
 
       message.textContent = 'Stock mis à jour avec succès.';
       message.classList.add('success');
@@ -497,19 +495,19 @@ function initGestionPage() {
       };
 
       if (documentId) {
-        await databases.updateDocument({
-          databaseId: DATABASE_ID,
-          collectionId: COLLECTIONS.items,
+        await databases.updateDocument(
+          DATABASE_ID,
+          COLLECTIONS.items,
           documentId,
           data
-        });
+        );
       } else {
-        await databases.createDocument({
-          databaseId: DATABASE_ID,
-          collectionId: COLLECTIONS.items,
-          documentId: ID.unique(),
+        await databases.createDocument(
+          DATABASE_ID,
+          COLLECTIONS.items,
+          ID.unique(),
           data
-        });
+        );
       }
 
       message.textContent = 'Consommable enregistré avec succès.';
@@ -540,11 +538,11 @@ function initGestionPage() {
       if (!confirmed) return;
 
       try {
-        await databases.deleteDocument({
-          databaseId: DATABASE_ID,
-          collectionId: COLLECTIONS.items,
-          documentId: deleteId
-        });
+        await databases.deleteDocument(
+          DATABASE_ID,
+          COLLECTIONS.items,
+          deleteId
+        );
 
         await renderGestion();
 
