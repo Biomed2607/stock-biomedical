@@ -12,10 +12,11 @@
       <h1>Stock</h1>
       <p>Entrées, sorties et alertes de consommables</p>
     </div>
+
     <nav>
       <a href="index.html">Accueil</a>
       <a href="stock.html">Stock</a>
-      <a href="stock-gestion.html">Gestion du stock</a>
+      <a href="gestion-stock.html">Gestion du stock</a>
     </nav>
   </header>
 
@@ -26,7 +27,9 @@
       <form id="movementForm" class="form-grid">
         <label>
           Consommable
-          <select id="itemSelect" required></select>
+          <select id="itemSelect" required>
+            <option value="">Chargement...</option>
+          </select>
         </label>
 
         <label>
@@ -53,7 +56,9 @@
     <section class="card">
       <div class="section-header">
         <h2>Alertes stock bas</h2>
-        <button id="prepareAlertsBtn" class="btn warning" type="button">Préparer email fournisseur</button>
+        <button id="prepareAlertsBtn" class="btn warning" type="button">
+          Préparer email fournisseur
+        </button>
       </div>
 
       <div id="alertsList">
@@ -64,7 +69,9 @@
     <section class="card">
       <div class="section-header">
         <h2>État du stock</h2>
-        <button id="exportBtn" class="btn secondary" type="button">Exporter CSV</button>
+        <button id="exportBtn" class="btn secondary" type="button">
+          Exporter CSV
+        </button>
       </div>
 
       <div class="table-wrapper">
