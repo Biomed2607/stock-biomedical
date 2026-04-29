@@ -1,4 +1,4 @@
-import { Client, Databases, ID, Query } from 'https://cdn.jsdelivr.net/npm/appwrite@17.0.0/+esm';
+import { Client, Databases, ID, Query } from 'https://cdn.jsdelivr.net/npm/appwrite@15.0.0/+esm';
 
 // ==============================
 // CONFIGURATION APPWRITE
@@ -14,7 +14,6 @@ const COLLECTIONS = {
   items: 'consommables',
   movements: 'mouvements_stock'
 };
-
 const DEFAULT_CATEGORY = 'Consommable';
 
 const client = new Client()
