@@ -1,30 +1,34 @@
-cimport { Client, Databases, ID, Query } from 'https://cdn.jsdelivr.net/npm/appwrite/+esm';
+import { Client, TablesDB, ID, Query } from 'https://cdn.jsdelivr.net/npm/appwrite@17.0.0/+esm';
 
 // ==============================
 // CONFIGURATION APPWRITE
 // ==============================
+
 const APPWRITE_ENDPOINT = 'https://cloud.appwrite.io/v1';
 const APPWRITE_PROJECT_ID = '69f1d5220033c670e25a';
+
+// Si erreur database_not_found, remplace cette valeur par l’ID exact dans Appwrite > Database > Paramètres.
 const DATABASE_ID = 'base de données biomédicales de stock';
 
-const COLLECTIONS = {
+const TABLES = {
   suppliers: 'fournisseurs',
   items: 'consommables',
   movements: 'mouvements_stock'
 };
 
-// Cette valeur doit exister dans ton enum Appwrite "category"
+// Cette valeur doit exister dans ton enum Appwrite "category".
 const DEFAULT_CATEGORY = 'Consommable';
 
 const client = new Client()
   .setEndpoint(APPWRITE_ENDPOINT)
   .setProject(APPWRITE_PROJECT_ID);
 
-const databases = new Databases(client);
+const tablesDB = new TablesDB(client);
 
 // ==============================
 // OUTILS
 // ==============================
+
 function euro(value) {
   return new Intl.NumberFormat('fr-FR', {
     style: 'currency',
@@ -41,20 +45,36 @@ function escapeHtml(value) {
     .replaceAll("'", '&#039;');
 }
 
+function safeNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+}
+
 function getStatus(item) {
-  if (Number(item.stockQuantity) <= 0) {
+  const qty = safeNumber(item.stockQuantity);
+  const threshold = safeNumber(item.alertThreshold);
+
+  if (qty <= 0) {
     return { label: 'Rupture', className: 'out' };
   }
 
-  if (Number(item.stockQuantity) <= Number(item.alertThreshold)) {
+  if (qty <= threshold) {
     return { label: 'Stock bas', className: 'low' };
   }
 
   return { label: 'OK', className: 'ok' };
 }
 
+function getSupplierEmail(item) {
+  return item.Email || item.supplierEmail || '';
+}
+
 function mailtoFor(item) {
-  const subject = encodeURIComponent(`Demande de devis - ${item.itemName} (${item.itemCode})`);
+  const supplierEmail = getSupplierEmail(item);
+
+  const subject = encodeURIComponent(
+    `Demande de devis - ${item.itemName} (${item.itemCode})`
+  );
 
   const body = encodeURIComponent(
 `Bonjour,
@@ -73,62 +93,76 @@ Merci de nous transmettre votre meilleure offre, le délai de livraison et le co
 Cordialement.`
   );
 
-  return `mailto:${item.Email}?subject=${subject}&body=${body}`;
+  return `mailto:${supplierEmail}?subject=${subject}&body=${body}`;
 }
 
+function showError(target, error) {
+  console.error(error);
+  if (target) {
+    target.innerHTML = `
+      <p class="message error">
+        Erreur Appwrite : ${escapeHtml(error.message || error)}
+      </p>
+    `;
+  }
+}
+
+// ==============================
+// APPWRITE : LECTURE
+// ==============================
+
 async function listItems() {
-  const response = await databases.listDocuments({
+  const response = await tablesDB.listRows({
     databaseId: DATABASE_ID,
-    collectionId: COLLECTIONS.items,
+    tableId: TABLES.items,
     queries: [
       Query.orderAsc('itemName'),
       Query.limit(100)
     ]
   });
 
-  return response.documents;
+  return response.rows || [];
 }
 
 async function findOrCreateSupplier({ supplier, contact, email, notes }) {
+  const cleanSupplier = supplier.trim();
   const cleanEmail = email.trim();
 
-  const existing = await databases.listDocuments({
+  const existing = await tablesDB.listRows({
     databaseId: DATABASE_ID,
-    collectionId: COLLECTIONS.suppliers,
+    tableId: TABLES.suppliers,
     queries: [
       Query.equal('email', [cleanEmail]),
       Query.limit(1)
     ]
   });
 
-  if (existing.documents.length > 0) {
-    const supplierDoc = existing.documents[0];
+  const found = existing.rows || [];
 
-    await databases.updateDocument({
+  if (found.length > 0) {
+    const supplierRow = found[0];
+
+    const updated = await tablesDB.updateRow({
       databaseId: DATABASE_ID,
-      collectionId: COLLECTIONS.suppliers,
-      documentId: supplierDoc.$id,
+      tableId: TABLES.suppliers,
+      rowId: supplierRow.$id,
       data: {
-        nom: supplier.trim(),
+        nom: cleanSupplier,
         contact: contact.trim() || null,
         email: cleanEmail,
         notes: notes.trim() || null
       }
     });
 
-    return {
-      ...supplierDoc,
-      nom: supplier.trim(),
-      email: cleanEmail
-    };
+    return updated;
   }
 
-  return databases.createDocument({
+  const created = await tablesDB.createRow({
     databaseId: DATABASE_ID,
-    collectionId: COLLECTIONS.suppliers,
-    documentId: ID.unique(),
+    tableId: TABLES.suppliers,
+    rowId: ID.unique(),
     data: {
-      nom: supplier.trim(),
+      nom: cleanSupplier,
       contact: contact.trim() || null,
       email: cleanEmail,
       telephone: null,
@@ -136,11 +170,14 @@ async function findOrCreateSupplier({ supplier, contact, email, notes }) {
       notes: notes.trim() || null
     }
   });
+
+  return created;
 }
 
 // ==============================
 // PAGE STOCK
 // ==============================
+
 function initStockPage() {
   const itemSelect = document.querySelector('#itemSelect');
   const stockTable = document.querySelector('#stockTable');
@@ -150,94 +187,126 @@ function initStockPage() {
   const exportBtn = document.querySelector('#exportBtn');
   const prepareAlertsBtn = document.querySelector('#prepareAlertsBtn');
 
-  if (!itemSelect || !stockTable) return;
+  if (!itemSelect || !stockTable || !form) return;
 
   let itemsCache = [];
 
-  async function render() {
+  async function renderStock() {
     try {
       itemsCache = await listItems();
 
-      itemSelect.innerHTML = itemsCache.map(item =>
-        `<option value="${item.$id}">${escapeHtml(item.itemCode)} — ${escapeHtml(item.itemName)}</option>`
-      ).join('');
+      if (!itemsCache.length) {
+        itemSelect.innerHTML = '<option value="">Aucun consommable</option>';
+        stockTable.innerHTML = '<tr><td colspan="7">Aucun consommable enregistré.</td></tr>';
+        alertsList.innerHTML = '<p>Aucune donnée disponible.</p>';
+        return;
+      }
+
+      itemSelect.innerHTML = itemsCache.map(item => `
+        <option value="${item.$id}">
+          ${escapeHtml(item.itemCode)} — ${escapeHtml(item.itemName)}
+        </option>
+      `).join('');
 
       stockTable.innerHTML = itemsCache.map(item => {
         const status = getStatus(item);
+        const supplierEmail = getSupplierEmail(item);
 
-        return `<tr>
-          <td>${escapeHtml(item.itemCode)}</td>
-          <td>${escapeHtml(item.itemName)}</td>
-          <td><strong>${Number(item.stockQuantity || 0)}</strong></td>
-          <td>${Number(item.alertThreshold || 0)}</td>
-          <td>${escapeHtml(item.supplierName || '')}</td>
-          <td><a href="mailto:${escapeHtml(item.Email || '')}">${escapeHtml(item.Email || '')}</a></td>
-          <td><span class="status ${status.className}">${status.label}</span></td>
-        </tr>`;
+        return `
+          <tr>
+            <td>${escapeHtml(item.itemCode)}</td>
+            <td>${escapeHtml(item.itemName)}</td>
+            <td><strong>${safeNumber(item.stockQuantity)}</strong></td>
+            <td>${safeNumber(item.alertThreshold)}</td>
+            <td>${escapeHtml(item.supplierName || '')}</td>
+            <td><a href="mailto:${escapeHtml(supplierEmail)}">${escapeHtml(supplierEmail)}</a></td>
+            <td><span class="status ${status.className}">${status.label}</span></td>
+          </tr>
+        `;
       }).join('');
 
       const lowItems = itemsCache.filter(item =>
-        Number(item.stockQuantity) <= Number(item.alertThreshold)
+        safeNumber(item.stockQuantity) <= safeNumber(item.alertThreshold)
       );
 
       alertsList.innerHTML = lowItems.length
-        ? lowItems.map(item => `<div class="alert">
+        ? lowItems.map(item => `
+          <div class="alert">
             <strong>${escapeHtml(item.itemName)}</strong><br />
-            Quantité actuelle : ${Number(item.stockQuantity || 0)} / seuil : ${Number(item.alertThreshold || 0)}<br />
-            Fournisseur : ${escapeHtml(item.supplierName || '-')} — ${escapeHtml(item.Email || '-')}<br />
-            <a class="btn warning" href="${mailtoFor(item)}">Envoyer une demande de devis</a>
-          </div>`).join('')
+            Référence : ${escapeHtml(item.itemCode)}<br />
+            Quantité actuelle : ${safeNumber(item.stockQuantity)}<br />
+            Seuil : ${safeNumber(item.alertThreshold)}<br />
+            Fournisseur : ${escapeHtml(item.supplierName || '-')}<br />
+            Email : ${escapeHtml(getSupplierEmail(item) || '-')}<br />
+            <a class="btn warning" href="${mailtoFor(item)}">
+              Envoyer une demande de devis
+            </a>
+          </div>
+        `).join('')
         : '<p>Aucune alerte : tous les consommables sont au-dessus du seuil.</p>';
 
     } catch (error) {
-      console.error(error);
-      alertsList.innerHTML = '<p>Erreur Appwrite : impossible de charger le stock. Vérifie Endpoint, Project ID, Database ID et permissions.</p>';
+      showError(alertsList, error);
+      stockTable.innerHTML = '<tr><td colspan="7">Erreur de chargement Appwrite.</td></tr>';
     }
   }
 
   form.addEventListener('submit', async event => {
     event.preventDefault();
+
     message.textContent = '';
+    message.className = 'message';
 
-    const id = itemSelect.value;
-    const type = document.querySelector('#movementType').value;
-    const qty = Number(document.querySelector('#movementQty').value);
-    const item = itemsCache.find(article => article.$id === id);
+    const rowId = itemSelect.value;
+    const movementType = document.querySelector('#movementType').value;
+    const movementQty = safeNumber(document.querySelector('#movementQty').value);
 
-    if (!item || qty <= 0) return;
+    const item = itemsCache.find(row => row.$id === rowId);
 
-    const oldQuantity = Number(item.stockQuantity || 0);
-
-    if (type === 'out' && qty > oldQuantity) {
-      message.textContent = 'Quantité insuffisante pour cette sortie.';
-      message.style.color = '#dc2626';
+    if (!item) {
+      message.textContent = 'Veuillez choisir un consommable.';
+      message.classList.add('error');
       return;
     }
 
-    const newQuantity = type === 'in'
-      ? oldQuantity + qty
-      : oldQuantity - qty;
+    if (movementQty <= 0) {
+      message.textContent = 'La quantité doit être supérieure à 0.';
+      message.classList.add('error');
+      return;
+    }
+
+    const oldQuantity = safeNumber(item.stockQuantity);
+
+    if (movementType === 'out' && movementQty > oldQuantity) {
+      message.textContent = 'Quantité insuffisante pour cette sortie.';
+      message.classList.add('error');
+      return;
+    }
+
+    const newQuantity = movementType === 'in'
+      ? oldQuantity + movementQty
+      : oldQuantity - movementQty;
 
     try {
-      await databases.updateDocument({
+      await tablesDB.updateRow({
         databaseId: DATABASE_ID,
-        collectionId: COLLECTIONS.items,
-        documentId: item.$id,
+        tableId: TABLES.items,
+        rowId: item.$id,
         data: {
           stockQuantity: newQuantity
         }
       });
 
-      await databases.createDocument({
+      await tablesDB.createRow({
         databaseId: DATABASE_ID,
-        collectionId: COLLECTIONS.movements,
-        documentId: ID.unique(),
+        tableId: TABLES.movements,
+        rowId: ID.unique(),
         data: {
           itemId: item.$id,
           itemCode: item.itemCode,
           itemName: item.itemName,
-          movementType: type === 'in' ? 'ENTREE' : 'SORTIE',
-          quantity: qty,
+          movementType: movementType === 'in' ? 'ENTREE' : 'SORTIE',
+          quantity: movementQty,
           oldQuantity,
           newQuantity,
           date: new Date().toISOString(),
@@ -246,22 +315,22 @@ function initStockPage() {
         }
       });
 
-      message.style.color = '#0f766e';
-      message.textContent = 'Stock mis à jour avec succès dans Appwrite.';
+      message.textContent = 'Stock mis à jour avec succès.';
+      message.classList.add('success');
 
       form.reset();
-      await render();
+      await renderStock();
 
     } catch (error) {
       console.error(error);
-      message.style.color = '#dc2626';
       message.textContent = `Erreur Appwrite : ${error.message}`;
+      message.classList.add('error');
     }
   });
 
-  prepareAlertsBtn.addEventListener('click', () => {
+  prepareAlertsBtn?.addEventListener('click', () => {
     const firstLow = itemsCache.find(item =>
-      Number(item.stockQuantity) <= Number(item.alertThreshold)
+      safeNumber(item.stockQuantity) <= safeNumber(item.alertThreshold)
     );
 
     if (!firstLow) {
@@ -272,19 +341,7 @@ function initStockPage() {
     window.location.href = mailtoFor(firstLow);
   });
 
-  exportBtn.addEventListener('click', () => {
-    const rows = itemsCache.map(item => [
-      item.supplierName,
-      item.Email,
-      item.itemCode,
-      item.itemName,
-      item.unitPrice,
-      item.stockQuantity,
-      item.alertThreshold,
-      item.category,
-      item.expirationDate || ''
-    ]);
-
+  exportBtn?.addEventListener('click', () => {
     const header = [
       'Fournisseur',
       'Email',
@@ -293,9 +350,19 @@ function initStockPage() {
       'Prix',
       'Quantité',
       'Seuil',
-      'Catégorie',
-      'Expiration'
+      'Catégorie'
     ];
+
+    const rows = itemsCache.map(item => [
+      item.supplierName || '',
+      getSupplierEmail(item),
+      item.itemCode || '',
+      item.itemName || '',
+      item.unitPrice || 0,
+      item.stockQuantity || 0,
+      item.alertThreshold || 0,
+      item.category || ''
+    ]);
 
     const csv = [header, ...rows]
       .map(row =>
@@ -313,12 +380,13 @@ function initStockPage() {
     link.click();
   });
 
-  render();
+  renderStock();
 }
 
 // ==============================
 // PAGE GESTION DU STOCK
 // ==============================
+
 function initGestionPage() {
   const form = document.querySelector('#itemForm');
   const table = document.querySelector('#itemsTable');
@@ -330,12 +398,20 @@ function initGestionPage() {
 
   let itemsCache = [];
 
-  async function fillForm(item) {
+  function clearForm() {
+    form.reset();
+    document.querySelector('#itemId').value = '';
+    document.querySelector('#formTitle').textContent = 'Ajouter un consommable';
+    message.textContent = '';
+    message.className = 'message';
+  }
+
+  function fillForm(item) {
     document.querySelector('#formTitle').textContent = 'Modifier un consommable';
     document.querySelector('#itemId').value = item.$id;
     document.querySelector('#supplier').value = item.supplierName || '';
     document.querySelector('#contact').value = '';
-    document.querySelector('#email').value = item.Email || '';
+    document.querySelector('#email').value = getSupplierEmail(item);
     document.querySelector('#reference').value = item.itemCode || '';
     document.querySelector('#designation').value = item.itemName || '';
     document.querySelector('#price').value = item.unitPrice || 0;
@@ -349,54 +425,73 @@ function initGestionPage() {
     });
   }
 
-  function clearForm() {
-    form.reset();
-    document.querySelector('#itemId').value = '';
-    document.querySelector('#formTitle').textContent = 'Ajouter un consommable';
-  }
-
-  async function render() {
+  async function renderGestion() {
     try {
-      const term = (searchInput.value || '').toLowerCase();
       itemsCache = await listItems();
 
-      const filteredItems = itemsCache.filter(item =>
+      const term = String(searchInput?.value || '').toLowerCase();
+
+      const filtered = itemsCache.filter(item =>
         String(item.itemCode || '').toLowerCase().includes(term) ||
         String(item.itemName || '').toLowerCase().includes(term) ||
         String(item.supplierName || '').toLowerCase().includes(term)
       );
 
-      table.innerHTML = filteredItems.map(item => `<tr>
-        <td>${escapeHtml(item.supplierName || '')}<br><small>${escapeHtml(item.Email || '')}</small></td>
-        <td>${escapeHtml(item.itemCode || '')}</td>
-        <td>${escapeHtml(item.itemName || '')}</td>
-        <td>${euro(item.unitPrice)}</td>
-        <td><strong>${Number(item.stockQuantity || 0)}</strong></td>
-        <td>${Number(item.alertThreshold || 0)}</td>
-        <td class="row-actions">
-          <button class="btn secondary" data-edit="${item.$id}">Modifier</button>
-          <button class="btn danger" data-delete="${item.$id}">Supprimer</button>
-        </td>
-      </tr>`).join('');
+      if (!filtered.length) {
+        table.innerHTML = '<tr><td colspan="7">Aucun consommable trouvé.</td></tr>';
+        return;
+      }
+
+      table.innerHTML = filtered.map(item => `
+        <tr>
+          <td>
+            ${escapeHtml(item.supplierName || '')}<br />
+            <small>${escapeHtml(getSupplierEmail(item))}</small>
+          </td>
+          <td>${escapeHtml(item.itemCode || '')}</td>
+          <td>${escapeHtml(item.itemName || '')}</td>
+          <td>${euro(item.unitPrice)}</td>
+          <td><strong>${safeNumber(item.stockQuantity)}</strong></td>
+          <td>${safeNumber(item.alertThreshold)}</td>
+          <td class="row-actions">
+            <button class="btn secondary" type="button" data-edit="${item.$id}">Modifier</button>
+            <button class="btn danger" type="button" data-delete="${item.$id}">Supprimer</button>
+          </td>
+        </tr>
+      `).join('');
 
     } catch (error) {
-      console.error(error);
       table.innerHTML = `<tr><td colspan="7">Erreur Appwrite : ${escapeHtml(error.message)}</td></tr>`;
+      console.error(error);
     }
   }
 
   form.addEventListener('submit', async event => {
     event.preventDefault();
-    message.textContent = '';
 
-    const documentId = document.querySelector('#itemId').value;
+    message.textContent = '';
+    message.className = 'message';
+
+    const rowId = document.querySelector('#itemId').value;
     const supplierName = document.querySelector('#supplier').value.trim();
     const contact = document.querySelector('#contact').value.trim();
     const email = document.querySelector('#email').value.trim();
     const notes = document.querySelector('#notes').value.trim();
 
+    const itemCode = document.querySelector('#reference').value.trim();
+    const itemName = document.querySelector('#designation').value.trim();
+    const unitPrice = safeNumber(document.querySelector('#price').value);
+    const stockQuantity = safeNumber(document.querySelector('#quantity').value);
+    const alertThreshold = safeNumber(document.querySelector('#threshold').value);
+
+    if (!supplierName || !email || !itemCode || !itemName) {
+      message.textContent = 'Veuillez remplir fournisseur, email, référence et désignation.';
+      message.classList.add('error');
+      return;
+    }
+
     try {
-      const supplierDoc = await findOrCreateSupplier({
+      const supplierRow = await findOrCreateSupplier({
         supplier: supplierName,
         contact,
         email,
@@ -404,44 +499,44 @@ function initGestionPage() {
       });
 
       const data = {
-        itemName: document.querySelector('#designation').value.trim(),
-        itemCode: document.querySelector('#reference').value.trim(),
+        itemName,
+        itemCode,
         category: DEFAULT_CATEGORY,
-        stockQuantity: Number(document.querySelector('#quantity').value),
-        unitPrice: Number(document.querySelector('#price').value),
+        stockQuantity,
+        unitPrice,
         expirationDate: null,
-        alertThreshold: Number(document.querySelector('#threshold').value),
-        supplierId: supplierDoc.$id,
+        alertThreshold,
+        supplierId: supplierRow.$id,
         supplierName,
         Email: email
       };
 
-      if (documentId) {
-        await databases.updateDocument({
+      if (rowId) {
+        await tablesDB.updateRow({
           databaseId: DATABASE_ID,
-          collectionId: COLLECTIONS.items,
-          documentId,
+          tableId: TABLES.items,
+          rowId,
           data
         });
       } else {
-        await databases.createDocument({
+        await tablesDB.createRow({
           databaseId: DATABASE_ID,
-          collectionId: COLLECTIONS.items,
-          documentId: ID.unique(),
+          tableId: TABLES.items,
+          rowId: ID.unique(),
           data
         });
       }
 
-      message.style.color = '#0f766e';
-      message.textContent = 'Consommable enregistré avec succès dans Appwrite.';
+      message.textContent = 'Consommable enregistré avec succès.';
+      message.classList.add('success');
 
       clearForm();
-      await render();
+      await renderGestion();
 
     } catch (error) {
       console.error(error);
-      message.style.color = '#dc2626';
       message.textContent = `Erreur Appwrite : ${error.message}`;
+      message.classList.add('error');
     }
   });
 
@@ -450,19 +545,23 @@ function initGestionPage() {
     const deleteId = event.target.dataset.delete;
 
     if (editId) {
-      const item = itemsCache.find(article => article.$id === editId);
+      const item = itemsCache.find(row => row.$id === editId);
       if (item) fillForm(item);
     }
 
-    if (deleteId && confirm('Supprimer ce consommable ?')) {
+    if (deleteId) {
+      const confirmed = confirm('Supprimer ce consommable ?');
+
+      if (!confirmed) return;
+
       try {
-        await databases.deleteDocument({
+        await tablesDB.deleteRow({
           databaseId: DATABASE_ID,
-          collectionId: COLLECTIONS.items,
-          documentId: deleteId
+          tableId: TABLES.items,
+          rowId: deleteId
         });
 
-        await render();
+        await renderGestion();
 
       } catch (error) {
         alert(`Erreur Appwrite : ${error.message}`);
@@ -470,11 +569,15 @@ function initGestionPage() {
     }
   });
 
-  resetBtn.addEventListener('click', clearForm);
-  searchInput.addEventListener('input', render);
+  resetBtn?.addEventListener('click', clearForm);
+  searchInput?.addEventListener('input', renderGestion);
 
-  render();
+  renderGestion();
 }
+
+// ==============================
+// DÉMARRAGE
+// ==============================
 
 initStockPage();
 initGestionPage();
