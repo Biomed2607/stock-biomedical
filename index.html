@@ -7,47 +7,52 @@
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
-  <header class="hero">
-    <nav class="navbar">
-      <div class="brand">BioStock</div>
-      <div class="nav-links">
-        <a href="index.html">Accueil</a>
-        <a href="stock.html">Stock</a>
-        <a href="gestion-stock.html">Gestion du stock</a>
-      </div>
+  <header class="site-header">
+    <div>
+      <h1>Stock Biomédical</h1>
+      <p>Plateforme de gestion des consommables biomédicaux</p>
+    </div>
+    <nav>
+      <a href="index.html">Accueil</a>
+      <a href="stock.html">Stock</a>
+      <a href="stock-gestion.html">Gestion du stock</a>
     </nav>
-
-    <section class="hero-content">
-      <span class="badge">Gestion biomédicale</span>
-      <h1>Plateforme de gestion du stock biomédical</h1>
-      <p>
-        Suivez les consommables, les fournisseurs, les entrées, les sorties,
-        les seuils d’alerte et les demandes de devis depuis une interface simple.
-      </p>
-      <div class="actions">
-        <a class="btn primary" href="stock.html">Ouvrir le stock</a>
-        <a class="btn secondary" href="gestion-stock.html">Gérer les articles</a>
-      </div>
-    </section>
   </header>
 
-  <main class="container cards-grid">
-    <article class="card">
-      <h2>Stock</h2>
-      <p>Entrer ou retirer des consommables avec mise à jour automatique des quantités.</p>
-    </article>
-    <article class="card">
-      <h2>Alertes</h2>
-      <p>Détecter les consommables proches de rupture et préparer un email au fournisseur.</p>
-    </article>
-    <article class="card">
-      <h2>Fournisseurs</h2>
-      <p>Centraliser fournisseur, contact, email, référence, prix et désignation.</p>
-    </article>
+  <main class="hero">
+    <section class="card hero-card">
+      <h2>Bienvenue</h2>
+      <p>
+        Cette application permet de gérer les fournisseurs, les consommables,
+        les entrées et sorties de stock, ainsi que les alertes de réapprovisionnement.
+      </p>
+
+      <div class="actions">
+        <a class="btn primary" href="stock.html">Gérer les entrées / sorties</a>
+        <a class="btn secondary" href="stock-gestion.html">Ajouter un consommable</a>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <h3>Stock</h3>
+        <p>Ajoutez ou retirez des consommables avec mise à jour automatique de la base Appwrite.</p>
+      </div>
+
+      <div class="card">
+        <h3>Gestion du stock</h3>
+        <p>Créez les fournisseurs, références, désignations, prix, quantités et seuils d’alerte.</p>
+      </div>
+
+      <div class="card">
+        <h3>Alertes</h3>
+        <p>Repérez les consommables proches de la rupture et préparez une demande de devis par email.</p>
+      </div>
+    </section>
   </main>
 
   <footer>
-    <p>© 2026 BioStock — Stock biomédical</p>
+    <p>Stock Biomédical — Appwrite + GitHub Pages</p>
   </footer>
 </body>
 </html>
