@@ -7,7 +7,7 @@ import { Client, Databases, ID, Query } from 'https://cdn.jsdelivr.net/npm/appwr
 const APPWRITE_ENDPOINT = 'https://cloud.appwrite.io/v1';
 const APPWRITE_PROJECT_ID = '69f1d5220033c670e25a';
 
-const DATABASE_ID = 'base de données biomédicales de stock';
+const DATABASE_ID = 'stock_biomedical_db';
 
 const COLLECTIONS = {
   suppliers: 'fournisseurs',
