@@ -3,58 +3,96 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gestion du stock | BioStock</title>
+  <title>Gestion du stock — Stock Biomédical</title>
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
-  <nav class="navbar page-nav">
-    <div class="brand">BioStock</div>
-    <div class="nav-links">
+  <header class="site-header">
+    <div>
+      <h1>Gestion du stock</h1>
+      <p>Création et modification des fournisseurs et consommables</p>
+    </div>
+
+    <nav>
       <a href="index.html">Accueil</a>
       <a href="stock.html">Stock</a>
-      <a href="gestion-stock.html" class="active">Gestion du stock</a>
-    </div>
-  </nav>
+      <a href="gestion-stock.html">Gestion du stock</a>
+    </nav>
+  </header>
 
   <main class="container">
-    <section class="page-header">
-      <div>
-        <span class="badge">Articles</span>
-        <h1>Gestion du stock</h1>
-        <p>Ajoutez ou modifiez les consommables, fournisseurs, prix, quantités et seuils.</p>
-      </div>
-    </section>
-
-    <section class="panel">
+    <section class="card">
       <h2 id="formTitle">Ajouter un consommable</h2>
-      <form id="itemForm" class="form-grid large">
+
+      <form id="itemForm" class="form-grid">
         <input type="hidden" id="itemId" />
-        <label>Fournisseur <input id="supplier" required placeholder="Ex : MedSupply" /></label>
-        <label>Contact <input id="contact" placeholder="Nom du contact" /></label>
-        <label>Email fournisseur <input id="email" type="email" required placeholder="contact@fournisseur.com" /></label>
-        <label>Référence <input id="reference" required placeholder="REF-001" /></label>
-        <label>Désignation <input id="designation" required placeholder="Gants nitrile taille M" /></label>
-        <label>Prix unitaire <input id="price" type="number" min="0" step="0.01" required /></label>
-        <label>Quantité <input id="quantity" type="number" min="0" required /></label>
-        <label>Seuil d’alerte <input id="threshold" type="number" min="0" required /></label>
-        <label class="full">Note / délai / conditionnement <textarea id="notes" rows="3" placeholder="Délai de livraison, conditionnement, remarques..."></textarea></label>
-        <button class="btn primary" type="submit">Enregistrer</button>
-        <button class="btn secondary" type="button" id="resetBtn">Réinitialiser</button>
+
+        <label>
+          Fournisseur
+          <input id="supplier" type="text" placeholder="Ex : Medline" required />
+        </label>
+
+        <label>
+          Contact fournisseur
+          <input id="contact" type="text" placeholder="Ex : Service commercial" />
+        </label>
+
+        <label>
+          Email fournisseur
+          <input id="email" type="email" placeholder="fournisseur@example.com" required />
+        </label>
+
+        <label>
+          Référence
+          <input id="reference" type="text" placeholder="Ex : GANT-NIT-M" required />
+        </label>
+
+        <label>
+          Désignation
+          <input id="designation" type="text" placeholder="Ex : Gants nitrile taille M" required />
+        </label>
+
+        <label>
+          Prix unitaire
+          <input id="price" type="number" min="0" step="0.01" value="0" required />
+        </label>
+
+        <label>
+          Quantité initiale
+          <input id="quantity" type="number" min="0" value="0" required />
+        </label>
+
+        <label>
+          Seuil d’alerte
+          <input id="threshold" type="number" min="0" value="5" required />
+        </label>
+
+        <label class="full">
+          Notes
+          <textarea id="notes" rows="3" placeholder="Informations complémentaires"></textarea>
+        </label>
+
+        <div class="form-actions full">
+          <button class="btn primary" type="submit">Enregistrer</button>
+          <button id="resetBtn" class="btn secondary" type="button">Réinitialiser</button>
+        </div>
       </form>
+
       <p id="formMessage" class="message"></p>
     </section>
 
-    <section class="panel">
-      <div class="section-title">
+    <section class="card">
+      <div class="section-header">
         <h2>Liste des consommables</h2>
-        <input id="searchInput" class="search" placeholder="Rechercher par réf., désignation ou fournisseur..." />
+        <input id="searchInput" class="search" type="search" placeholder="Rechercher..." />
       </div>
+
       <div class="table-wrapper">
         <table>
           <thead>
             <tr>
               <th>Fournisseur</th>
-              <th>Réf.</th>
+              <th>Référence</th>
               <th>Désignation</th>
               <th>Prix</th>
               <th>Quantité</th>
@@ -62,12 +100,16 @@
               <th>Actions</th>
             </tr>
           </thead>
-          <tbody id="itemsTable"></tbody>
+          <tbody id="itemsTable">
+            <tr>
+              <td colspan="7">Chargement des consommables...</td>
+            </tr>
+          </tbody>
         </table>
       </div>
     </section>
   </main>
 
-  <script src="js/index.js"></script>
+  <script type="module" src="js/index.js"></script>
 </body>
 </html>
