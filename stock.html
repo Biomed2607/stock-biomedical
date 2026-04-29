@@ -3,67 +3,75 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Stock | BioStock</title>
+  <title>Stock — Stock Biomédical</title>
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
-  <nav class="navbar page-nav">
-    <div class="brand">BioStock</div>
-    <div class="nav-links">
-      <a href="index.html">Accueil</a>
-      <a href="stock.html" class="active">Stock</a>
-      <a href="gestion-stock.html">Gestion du stock</a>
+  <header class="site-header">
+    <div>
+      <h1>Stock</h1>
+      <p>Entrées, sorties et alertes de consommables</p>
     </div>
-  </nav>
+    <nav>
+      <a href="index.html">Accueil</a>
+      <a href="stock.html">Stock</a>
+      <a href="stock-gestion.html">Gestion du stock</a>
+    </nav>
+  </header>
 
   <main class="container">
-    <section class="page-header">
-      <div>
-        <span class="badge">Mouvements</span>
-        <h1>Entrée et sortie des consommables</h1>
-        <p>Choisissez un article, indiquez la quantité, puis validez l’entrée ou la sortie.</p>
-      </div>
-      <button class="btn secondary" id="exportBtn">Exporter CSV</button>
-    </section>
+    <section class="card">
+      <h2>Ajouter ou retirer un consommable</h2>
 
-    <section class="panel">
-      <h2>Mettre à jour le stock</h2>
       <form id="movementForm" class="form-grid">
         <label>
           Consommable
           <select id="itemSelect" required></select>
         </label>
+
         <label>
-          Type de mouvement
+          Mouvement
           <select id="movementType" required>
-            <option value="in">Entrée</option>
-            <option value="out">Sortie</option>
+            <option value="in">Entrée de stock</option>
+            <option value="out">Sortie de stock</option>
           </select>
         </label>
+
         <label>
           Quantité
           <input id="movementQty" type="number" min="1" required />
         </label>
-        <button class="btn primary" type="submit">Mettre à jour</button>
+
+        <div class="form-actions">
+          <button class="btn primary" type="submit">Valider le mouvement</button>
+        </div>
       </form>
+
       <p id="movementMessage" class="message"></p>
     </section>
 
-    <section class="panel">
-      <div class="section-title">
-        <h2>Alertes de stock</h2>
-        <button class="btn warning" id="prepareAlertsBtn">Préparer emails fournisseurs</button>
+    <section class="card">
+      <div class="section-header">
+        <h2>Alertes stock bas</h2>
+        <button id="prepareAlertsBtn" class="btn warning" type="button">Préparer email fournisseur</button>
       </div>
-      <div id="alertsList" class="alerts-list"></div>
+
+      <div id="alertsList">
+        <p>Chargement des alertes...</p>
+      </div>
     </section>
 
-    <section class="panel">
-      <h2>État du stock</h2>
+    <section class="card">
+      <div class="section-header">
+        <h2>État du stock</h2>
+        <button id="exportBtn" class="btn secondary" type="button">Exporter CSV</button>
+      </div>
+
       <div class="table-wrapper">
         <table>
           <thead>
             <tr>
-              <th>Réf.</th>
+              <th>Référence</th>
               <th>Désignation</th>
               <th>Quantité</th>
               <th>Seuil</th>
@@ -72,12 +80,16 @@
               <th>Statut</th>
             </tr>
           </thead>
-          <tbody id="stockTable"></tbody>
+          <tbody id="stockTable">
+            <tr>
+              <td colspan="7">Chargement du stock...</td>
+            </tr>
+          </tbody>
         </table>
       </div>
     </section>
   </main>
 
-  <script src="js/index.js"></script>
+  <script type="module" src="js/index.js"></script>
 </body>
 </html>
