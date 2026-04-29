@@ -1,4 +1,4 @@
-import { Client, TablesDB, ID, Query } from 'https://cdn.jsdelivr.net/npm/appwrite@17.0.0/+esm';
+import { Client, Databases, ID, Query } from 'https://cdn.jsdelivr.net/npm/appwrite@17.0.0/+esm';
 
 // ==============================
 // CONFIGURATION APPWRITE
@@ -7,24 +7,23 @@ import { Client, TablesDB, ID, Query } from 'https://cdn.jsdelivr.net/npm/appwri
 const APPWRITE_ENDPOINT = 'https://cloud.appwrite.io/v1';
 const APPWRITE_PROJECT_ID = '69f1d5220033c670e25a';
 
-// IMPORTANT : si erreur database_not_found, il faudra remplacer cette valeur
-// par l'ID exact affiché dans Appwrite > Database > Settings.
+// Si erreur database_not_found, copie l'ID exact depuis Appwrite > Database > Paramètres
 const DATABASE_ID = 'base de données biomédicales de stock';
 
-const TABLES = {
+const COLLECTIONS = {
   suppliers: 'fournisseurs',
   items: 'consommables',
   movements: 'mouvements_stock'
 };
 
-// Cette valeur doit exister dans ton enum Appwrite "category".
+// Cette valeur doit exister dans ton enum Appwrite "category"
 const DEFAULT_CATEGORY = 'Consommable';
 
 const client = new Client()
   .setEndpoint(APPWRITE_ENDPOINT)
   .setProject(APPWRITE_PROJECT_ID);
 
-const tablesDB = new TablesDB(client);
+const databases = new Databases(client);
 
 // ==============================
 // OUTILS
@@ -97,41 +96,45 @@ Cordialement.`
   return `mailto:${supplierEmail}?subject=${subject}&body=${body}`;
 }
 
+// ==============================
+// APPWRITE
+// ==============================
+
 async function listItems() {
-  const response = await tablesDB.listRows({
+  const response = await databases.listDocuments({
     databaseId: DATABASE_ID,
-    tableId: TABLES.items,
+    collectionId: COLLECTIONS.items,
     queries: [
       Query.orderAsc('itemName'),
       Query.limit(100)
     ]
   });
 
-  return response.rows || [];
+  return response.documents || [];
 }
 
 async function findOrCreateSupplier({ supplier, contact, email, notes }) {
   const cleanSupplier = supplier.trim();
   const cleanEmail = email.trim();
 
-  const existing = await tablesDB.listRows({
+  const existing = await databases.listDocuments({
     databaseId: DATABASE_ID,
-    tableId: TABLES.suppliers,
+    collectionId: COLLECTIONS.suppliers,
     queries: [
       Query.equal('email', [cleanEmail]),
       Query.limit(1)
     ]
   });
 
-  const found = existing.rows || [];
+  const found = existing.documents || [];
 
   if (found.length > 0) {
-    const supplierRow = found[0];
+    const supplierDoc = found[0];
 
-    return tablesDB.updateRow({
+    return databases.updateDocument({
       databaseId: DATABASE_ID,
-      tableId: TABLES.suppliers,
-      rowId: supplierRow.$id,
+      collectionId: COLLECTIONS.suppliers,
+      documentId: supplierDoc.$id,
       data: {
         nom: cleanSupplier,
         contact: contact.trim() || null,
@@ -141,10 +144,10 @@ async function findOrCreateSupplier({ supplier, contact, email, notes }) {
     });
   }
 
-  return tablesDB.createRow({
+  return databases.createDocument({
     databaseId: DATABASE_ID,
-    tableId: TABLES.suppliers,
-    rowId: ID.unique(),
+    collectionId: COLLECTIONS.suppliers,
+    documentId: ID.unique(),
     data: {
       nom: cleanSupplier,
       contact: contact.trim() || null,
@@ -240,10 +243,10 @@ function initStockPage() {
     message.textContent = '';
     message.className = 'message';
 
-    const rowId = itemSelect.value;
+    const documentId = itemSelect.value;
     const movementType = document.querySelector('#movementType').value;
     const movementQty = safeNumber(document.querySelector('#movementQty').value);
-    const item = itemsCache.find(row => row.$id === rowId);
+    const item = itemsCache.find(doc => doc.$id === documentId);
 
     if (!item) {
       message.textContent = 'Veuillez choisir un consommable.';
@@ -270,19 +273,19 @@ function initStockPage() {
       : oldQuantity - movementQty;
 
     try {
-      await tablesDB.updateRow({
+      await databases.updateDocument({
         databaseId: DATABASE_ID,
-        tableId: TABLES.items,
-        rowId: item.$id,
+        collectionId: COLLECTIONS.items,
+        documentId: item.$id,
         data: {
           stockQuantity: newQuantity
         }
       });
 
-      await tablesDB.createRow({
+      await databases.createDocument({
         databaseId: DATABASE_ID,
-        tableId: TABLES.movements,
-        rowId: ID.unique(),
+        collectionId: COLLECTIONS.movements,
+        documentId: ID.unique(),
         data: {
           itemId: item.$id,
           itemCode: item.itemCode,
@@ -454,7 +457,7 @@ function initGestionPage() {
     message.textContent = '';
     message.className = 'message';
 
-    const rowId = document.querySelector('#itemId').value;
+    const documentId = document.querySelector('#itemId').value;
     const supplierName = document.querySelector('#supplier').value.trim();
     const contact = document.querySelector('#contact').value.trim();
     const email = document.querySelector('#email').value.trim();
@@ -473,7 +476,7 @@ function initGestionPage() {
     }
 
     try {
-      const supplierRow = await findOrCreateSupplier({
+      const supplierDoc = await findOrCreateSupplier({
         supplier: supplierName,
         contact,
         email,
@@ -488,23 +491,23 @@ function initGestionPage() {
         unitPrice,
         expirationDate: null,
         alertThreshold,
-        supplierId: supplierRow.$id,
+        supplierId: supplierDoc.$id,
         supplierName,
         Email: email
       };
 
-      if (rowId) {
-        await tablesDB.updateRow({
+      if (documentId) {
+        await databases.updateDocument({
           databaseId: DATABASE_ID,
-          tableId: TABLES.items,
-          rowId,
+          collectionId: COLLECTIONS.items,
+          documentId,
           data
         });
       } else {
-        await tablesDB.createRow({
+        await databases.createDocument({
           databaseId: DATABASE_ID,
-          tableId: TABLES.items,
-          rowId: ID.unique(),
+          collectionId: COLLECTIONS.items,
+          documentId: ID.unique(),
           data
         });
       }
@@ -527,7 +530,7 @@ function initGestionPage() {
     const deleteId = event.target.dataset.delete;
 
     if (editId) {
-      const item = itemsCache.find(row => row.$id === editId);
+      const item = itemsCache.find(doc => doc.$id === editId);
       if (item) fillForm(item);
     }
 
@@ -537,10 +540,10 @@ function initGestionPage() {
       if (!confirmed) return;
 
       try {
-        await tablesDB.deleteRow({
+        await databases.deleteDocument({
           databaseId: DATABASE_ID,
-          tableId: TABLES.items,
-          rowId: deleteId
+          collectionId: COLLECTIONS.items,
+          documentId: deleteId
         });
 
         await renderGestion();
