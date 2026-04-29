@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stock | BioStock</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <nav class="navbar page-nav">
+    <div class="brand">BioStock</div>
+    <div class="nav-links">
+      <a href="index.html">Accueil</a>
+      <a href="stock.html" class="active">Stock</a>
+      <a href="gestion-stock.html">Gestion du stock</a>
+    </div>
+  </nav>
+
+  <main class="container">
+    <section class="page-header">
+      <div>
+        <span class="badge">Mouvements</span>
+        <h1>Entrée et sortie des consommables</h1>
+        <p>Choisissez un article, indiquez la quantité, puis validez l’entrée ou la sortie.</p>
+      </div>
+      <button class="btn secondary" id="exportBtn">Exporter CSV</button>
+    </section>
+
+    <section class="panel">
+      <h2>Mettre à jour le stock</h2>
+      <form id="movementForm" class="form-grid">
+        <label>
+          Consommable
+          <select id="itemSelect" required></select>
+        </label>
+        <label>
+          Type de mouvement
+          <select id="movementType" required>
+            <option value="in">Entrée</option>
+            <option value="out">Sortie</option>
+          </select>
+        </label>
+        <label>
+          Quantité
+          <input id="movementQty" type="number" min="1" required />
+        </label>
+        <button class="btn primary" type="submit">Mettre à jour</button>
+      </form>
+      <p id="movementMessage" class="message"></p>
+    </section>
+
+    <section class="panel">
+      <div class="section-title">
+        <h2>Alertes de stock</h2>
+        <button class="btn warning" id="prepareAlertsBtn">Préparer emails fournisseurs</button>
+      </div>
+      <div id="alertsList" class="alerts-list"></div>
+    </section>
+
+    <section class="panel">
+      <h2>État du stock</h2>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Réf.</th>
+              <th>Désignation</th>
+              <th>Quantité</th>
+              <th>Seuil</th>
+              <th>Fournisseur</th>
+              <th>Email</th>
+              <th>Statut</th>
+            </tr>
+          </thead>
+          <tbody id="stockTable"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="js/index.js"></script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestion du stock | BioStock</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <nav class="navbar page-nav">
+    <div class="brand">BioStock</div>
+    <div class="nav-links">
+      <a href="index.html">Accueil</a>
+      <a href="stock.html">Stock</a>
+      <a href="gestion-stock.html" class="active">Gestion du stock</a>
+    </div>
+  </nav>
+
+  <main class="container">
+    <section class="page-header">
+      <div>
+        <span class="badge">Articles</span>
+        <h1>Gestion du stock</h1>
+        <p>Ajoutez ou modifiez les consommables, fournisseurs, prix, quantités et seuils.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2 id="formTitle">Ajouter un consommable</h2>
+      <form id="itemForm" class="form-grid large">
+        <input type="hidden" id="itemId" />
+        <label>Fournisseur <input id="supplier" required placeholder="Ex : MedSupply" /></label>
+        <label>Contact <input id="contact" placeholder="Nom du contact" /></label>
+        <label>Email fournisseur <input id="email" type="email" required placeholder="contact@fournisseur.com" /></label>
+        <label>Référence <input id="reference" required placeholder="REF-001" /></label>
+        <label>Désignation <input id="designation" required placeholder="Gants nitrile taille M" /></label>
+        <label>Prix unitaire <input id="price" type="number" min="0" step="0.01" required /></label>
+        <label>Quantité <input id="quantity" type="number" min="0" required /></label>
+        <label>Seuil d’alerte <input id="threshold" type="number" min="0" required /></label>
+        <label class="full">Note / délai / conditionnement <textarea id="notes" rows="3" placeholder="Délai de livraison, conditionnement, remarques..."></textarea></label>
+        <button class="btn primary" type="submit">Enregistrer</button>
+        <button class="btn secondary" type="button" id="resetBtn">Réinitialiser</button>
+      </form>
+      <p id="formMessage" class="message"></p>
+    </section>
+
+    <section class="panel">
+      <div class="section-title">
+        <h2>Liste des consommables</h2>
+        <input id="searchInput" class="search" placeholder="Rechercher par réf., désignation ou fournisseur..." />
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Fournisseur</th>
+              <th>Réf.</th>
+              <th>Désignation</th>
+              <th>Prix</th>
+              <th>Quantité</th>
+              <th>Seuil</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="itemsTable"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="js/index.js"></script>
+</body>
+</html>
