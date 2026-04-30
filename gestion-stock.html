@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Gestion du stock — Stock Biomédical</title>
   <link rel="stylesheet" href="styles.css" />
+
+  <!-- Génération des codes-barres -->
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 </head>
 <body>
   <header class="site-header">
@@ -26,6 +29,7 @@
 
       <form id="itemForm" class="form-grid">
         <input type="hidden" id="itemId" />
+        <input type="hidden" id="itemBarcode" />
 
         <label>
           Référence
@@ -49,6 +53,16 @@
         <label>
           Prix unitaire
           <input id="price" type="number" min="0" step="0.01" value="0" required />
+        </label>
+
+        <label>
+          Code interne
+          <input id="internalCode" type="text" placeholder="Ex : INT-GANT-001" required />
+        </label>
+
+        <label>
+          Emplacement
+          <input id="storageLocation" type="text" placeholder="Ex : R1 - Étagère 1" required />
         </label>
 
         <label>
@@ -93,15 +107,18 @@
               <th>Référence</th>
               <th>Désignation</th>
               <th>Catégorie</th>
+              <th>Code interne</th>
+              <th>Emplacement</th>
               <th>Fournisseur</th>
               <th>Email</th>
               <th>Prix</th>
+              <th>Code-barres</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody id="itemsTable">
             <tr>
-              <td colspan="7">Chargement des consommables...</td>
+              <td colspan="10">Chargement des consommables...</td>
             </tr>
           </tbody>
         </table>
