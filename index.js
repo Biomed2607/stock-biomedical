@@ -16,7 +16,7 @@ const COLLECTIONS = {
 };
 
 // Cette valeur doit exister dans l'enum Appwrite "category"
-const DEFAULT_CATEGORY = 'consommable';
+const DEFAULT_CATEGORY = 'Consommable';
 
 const client = new Client()
   .setEndpoint(APPWRITE_ENDPOINT)
