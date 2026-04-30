@@ -6,8 +6,8 @@
   <title>Stock — Stock Biomédical</title>
   <link rel="stylesheet" href="styles.css" />
 
-  <!-- Lecture/affichage des codes-barres -->
-  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+  <!-- Scan QR code avec caméra -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
 </head>
 <body>
   <header class="site-header">
@@ -25,14 +25,29 @@
 
   <main class="container">
     <section class="card">
+      <h2>Scanner un QR code</h2>
+
+      <div class="form-grid">
+        <label>
+          Saisir ou scanner le QR code
+          <input id="qrSearch" type="text" placeholder="Scanner ou saisir le QR code" />
+        </label>
+
+        <div class="form-actions">
+          <button id="searchQrBtn" class="btn secondary" type="button">Rechercher</button>
+          <button id="startScannerBtn" class="btn primary" type="button">Ouvrir la caméra</button>
+          <button id="stopScannerBtn" class="btn danger" type="button">Fermer la caméra</button>
+        </div>
+      </div>
+
+      <div id="qrReader" class="qr-reader"></div>
+      <p id="scanMessage" class="message"></p>
+    </section>
+
+    <section class="card">
       <h2>Gérer le stock</h2>
 
       <form id="movementForm" class="form-grid">
-        <label>
-          Scanner ou saisir le code-barres
-          <input id="barcodeSearch" type="text" placeholder="Scanner ou saisir le code-barres puis Entrée" />
-        </label>
-
         <label>
           Consommable
           <select id="itemSelect" required>
@@ -86,8 +101,6 @@
             <tr>
               <th>Référence</th>
               <th>Désignation</th>
-              <th>Code interne</th>
-              <th>Code-barres</th>
               <th>Emplacement</th>
               <th>Quantité</th>
               <th>Seuil</th>
@@ -98,7 +111,7 @@
           </thead>
           <tbody id="stockTable">
             <tr>
-              <td colspan="10">Chargement du stock...</td>
+              <td colspan="8">Chargement du stock...</td>
             </tr>
           </tbody>
         </table>
