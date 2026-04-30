@@ -56,12 +56,16 @@ function normalizeCode(value) {
     .replace(/[^A-Z0-9_-]/g, '');
 }
 
-function generateBarcodeValue(itemCode, internalCode) {
-  const base = normalizeCode(internalCode || itemCode || 'BIO');
+function generateInternalCode(itemCode) {
+  const base = normalizeCode(itemCode || 'BIO');
   const stamp = Date.now().toString(36).toUpperCase();
   const random = Math.random().toString(36).slice(2, 7).toUpperCase();
 
-  return `BIO-${base}-${stamp}-${random}`.slice(0, 150);
+  return `BIO-${base}-${stamp}-${random}`.slice(0, 100);
+}
+
+function generateQrValue(internalCode) {
+  return internalCode;
 }
 
 function getSupplierEmail(item) {
@@ -97,8 +101,7 @@ Nous souhaitons recevoir un devis ou organiser un réapprovisionnement pour le c
 
 Référence : ${item.itemCode}
 Désignation : ${item.itemName}
-Code interne : ${item.internalCode || '-'}
-Code-barres : ${item.barcodeValue || '-'}
+QR code : ${item.barcodeValue || '-'}
 Emplacement : ${item.storageLocation || '-'}
 
 Quantité actuelle : ${item.stockQuantity}
@@ -115,40 +118,39 @@ Cordialement.`
   return `mailto:${supplierEmail}?subject=${subject}&body=${body}`;
 }
 
-function renderBarcodeSvg(svgElement, barcodeValue) {
-  if (!svgElement || !barcodeValue) return;
+function renderQrCode(element, value, size = 74) {
+  if (!element || !value) return;
 
-  if (!window.JsBarcode) {
-    svgElement.outerHTML = `<span>${escapeHtml(barcodeValue)}</span>`;
+  element.innerHTML = '';
+
+  if (!window.QRCode) {
+    element.textContent = value;
     return;
   }
 
-  window.JsBarcode(svgElement, barcodeValue, {
-    format: 'CODE128',
-    width: 1.2,
-    height: 42,
-    displayValue: true,
-    fontSize: 11,
-    margin: 4
+  new window.QRCode(element, {
+    text: value,
+    width: size,
+    height: size,
+    correctLevel: window.QRCode.CorrectLevel.M
   });
 }
 
-function renderAllBarcodes() {
-  document.querySelectorAll('[data-barcode-value]').forEach(svg => {
-    const value = svg.getAttribute('data-barcode-value');
-    renderBarcodeSvg(svg, value);
+function renderAllQrCodes() {
+  document.querySelectorAll('[data-qr-value]').forEach(element => {
+    const value = element.getAttribute('data-qr-value');
+    renderQrCode(element, value, 74);
   });
 }
 
-function printBarcode(item) {
-  const barcodeValue = item.barcodeValue || '';
+function printQrCode(item) {
+  const qrValue = item.barcodeValue || '';
   const itemCode = item.itemCode || '';
   const itemName = item.itemName || '';
-  const internalCode = item.internalCode || '';
   const storageLocation = item.storageLocation || '';
 
-  if (!barcodeValue) {
-    alert('Aucun code-barres disponible pour ce consommable.');
+  if (!qrValue) {
+    alert('Aucun QR code disponible pour ce consommable.');
     return;
   }
 
@@ -164,8 +166,8 @@ function printBarcode(item) {
     <html lang="fr">
     <head>
       <meta charset="UTF-8" />
-      <title>Code-barres — ${escapeHtml(itemCode)}</title>
-      <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
+      <title>QR code — ${escapeHtml(itemCode)}</title>
+      <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script>
       <style>
         body {
           font-family: Arial, sans-serif;
@@ -174,25 +176,27 @@ function printBarcode(item) {
         }
 
         .label {
-          width: 360px;
+          width: 340px;
           border: 1px solid #111827;
           border-radius: 12px;
           padding: 18px;
+          text-align: center;
         }
 
         h1 {
           font-size: 18px;
-          margin: 0 0 6px;
+          margin: 0 0 8px;
         }
 
         p {
-          margin: 4px 0;
+          margin: 5px 0;
           font-size: 13px;
         }
 
-        svg {
-          margin-top: 12px;
-          width: 100%;
+        #qrcode {
+          width: 170px;
+          height: 170px;
+          margin: 16px auto;
         }
 
         @media print {
@@ -206,22 +210,20 @@ function printBarcode(item) {
       <div class="label">
         <h1>${escapeHtml(itemName)}</h1>
         <p><strong>Référence :</strong> ${escapeHtml(itemCode)}</p>
-        <p><strong>Code interne :</strong> ${escapeHtml(internalCode)}</p>
         <p><strong>Emplacement :</strong> ${escapeHtml(storageLocation)}</p>
-        <svg id="barcode"></svg>
+        <div id="qrcode"></div>
+        <p>${escapeHtml(qrValue)}</p>
       </div>
 
       <br />
       <button onclick="window.print()">Imprimer</button>
 
       <script>
-        JsBarcode("#barcode", ${JSON.stringify(barcodeValue)}, {
-          format: "CODE128",
-          width: 1.4,
-          height: 60,
-          displayValue: true,
-          fontSize: 14,
-          margin: 8
+        new QRCode(document.getElementById("qrcode"), {
+          text: ${JSON.stringify(qrValue)},
+          width: 170,
+          height: 170,
+          correctLevel: QRCode.CorrectLevel.M
         });
       <\/script>
     </body>
@@ -300,19 +302,34 @@ async function findOrCreateSupplier({ supplier, contact, email, notes }) {
 
 function initStockPage() {
   const itemSelect = document.querySelector('#itemSelect');
-  const barcodeSearch = document.querySelector('#barcodeSearch');
+  const qrSearch = document.querySelector('#qrSearch');
+  const searchQrBtn = document.querySelector('#searchQrBtn');
+  const startScannerBtn = document.querySelector('#startScannerBtn');
+  const stopScannerBtn = document.querySelector('#stopScannerBtn');
+  const qrReader = document.querySelector('#qrReader');
+
   const currentQtyInput = document.querySelector('#currentQty');
   const thresholdInput = document.querySelector('#stockThreshold');
   const stockTable = document.querySelector('#stockTable');
   const form = document.querySelector('#movementForm');
   const message = document.querySelector('#movementMessage');
+  const scanMessage = document.querySelector('#scanMessage');
   const selectedItemInfo = document.querySelector('#selectedItemInfo');
 
   if (!itemSelect || !stockTable || !form) return;
 
   let itemsCache = [];
+  let qrScanner = null;
+  let scannerRunning = false;
 
-  function findItemByBarcodeOrCode(value) {
+  function setScanMessage(text, type = '') {
+    if (!scanMessage) return;
+
+    scanMessage.textContent = text;
+    scanMessage.className = type ? `message ${type}` : 'message';
+  }
+
+  function findItemByQr(value) {
     const search = String(value || '').trim().toLowerCase();
 
     if (!search) return null;
@@ -322,6 +339,31 @@ function initStockPage() {
       String(item.internalCode || '').toLowerCase() === search ||
       String(item.itemCode || '').toLowerCase() === search
     );
+  }
+
+  function selectItem(item) {
+    if (!item) return;
+
+    itemSelect.value = item.$id;
+    updateSelectedItemInfo();
+
+    setScanMessage(`Consommable trouvé : ${item.itemCode} — ${item.itemName}`, 'success');
+
+    const qtyInput = document.querySelector('#movementQty');
+    if (qtyInput) qtyInput.focus();
+  }
+
+  function handleQrSearch(value) {
+    const item = findItemByQr(value);
+
+    if (!item) {
+      setScanMessage('Aucun consommable trouvé avec ce QR code.', 'error');
+      return;
+    }
+
+    selectItem(item);
+
+    if (qrSearch) qrSearch.value = '';
   }
 
   function updateSelectedItemInfo() {
@@ -345,9 +387,8 @@ function initStockPage() {
     if (selectedItemInfo) {
       selectedItemInfo.innerHTML = `
         <strong>${escapeHtml(selectedItem.itemCode)} — ${escapeHtml(selectedItem.itemName)}</strong><br />
-        Code interne : ${escapeHtml(selectedItem.internalCode || '-')} |
-        Code-barres : ${escapeHtml(selectedItem.barcodeValue || '-')} |
-        Emplacement : ${escapeHtml(selectedItem.storageLocation || '-')}
+        Emplacement : ${escapeHtml(selectedItem.storageLocation || '-')} |
+        QR code : ${escapeHtml(selectedItem.barcodeValue || '-')}
       `;
     }
   }
@@ -362,7 +403,7 @@ function initStockPage() {
         if (currentQtyInput) currentQtyInput.value = 0;
         if (thresholdInput) thresholdInput.value = 0;
 
-        stockTable.innerHTML = '<tr><td colspan="10">Aucun consommable enregistré.</td></tr>';
+        stockTable.innerHTML = '<tr><td colspan="8">Aucun consommable enregistré.</td></tr>';
         return;
       }
 
@@ -382,8 +423,6 @@ function initStockPage() {
           <tr>
             <td>${escapeHtml(item.itemCode)}</td>
             <td>${escapeHtml(item.itemName)}</td>
-            <td>${escapeHtml(item.internalCode || '')}</td>
-            <td>${escapeHtml(item.barcodeValue || '')}</td>
             <td>${escapeHtml(item.storageLocation || '')}</td>
             <td><strong>${safeNumber(item.stockQuantity)}</strong></td>
             <td>${safeNumber(item.alertThreshold)}</td>
@@ -404,34 +443,76 @@ function initStockPage() {
 
     } catch (error) {
       console.error(error);
-      stockTable.innerHTML = '<tr><td colspan="10">Erreur de chargement Appwrite.</td></tr>';
+      stockTable.innerHTML = '<tr><td colspan="8">Erreur de chargement Appwrite.</td></tr>';
+    }
+  }
+
+  async function startScanner() {
+    if (!qrReader) return;
+
+    if (!window.Html5Qrcode) {
+      setScanMessage('Le module de scan QR code n’est pas disponible.', 'error');
+      return;
+    }
+
+    if (scannerRunning) return;
+
+    try {
+      qrScanner = new window.Html5Qrcode('qrReader');
+
+      await qrScanner.start(
+        { facingMode: 'environment' },
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 }
+        },
+        decodedText => {
+          handleQrSearch(decodedText);
+        }
+      );
+
+      scannerRunning = true;
+      setScanMessage('Caméra active. Flashez un QR code.', 'success');
+
+    } catch (error) {
+      console.error(error);
+      setScanMessage(`Erreur caméra : ${error.message || error}`, 'error');
+    }
+  }
+
+  async function stopScanner() {
+    if (!qrScanner || !scannerRunning) return;
+
+    try {
+      await qrScanner.stop();
+      await qrScanner.clear();
+
+      scannerRunning = false;
+      qrScanner = null;
+
+      setScanMessage('Caméra fermée.');
+
+    } catch (error) {
+      console.error(error);
+      setScanMessage(`Erreur fermeture caméra : ${error.message || error}`, 'error');
     }
   }
 
   itemSelect.addEventListener('change', updateSelectedItemInfo);
 
-  barcodeSearch?.addEventListener('keydown', event => {
+  qrSearch?.addEventListener('keydown', event => {
     if (event.key !== 'Enter') return;
 
     event.preventDefault();
-
-    const foundItem = findItemByBarcodeOrCode(barcodeSearch.value);
-
-    if (!foundItem) {
-      message.textContent = 'Aucun consommable trouvé avec ce code.';
-      message.className = 'message error';
-      return;
-    }
-
-    itemSelect.value = foundItem.$id;
-    updateSelectedItemInfo();
-
-    message.textContent = `Consommable trouvé : ${foundItem.itemCode} — ${foundItem.itemName}`;
-    message.className = 'message success';
-
-    barcodeSearch.value = '';
-    document.querySelector('#movementQty')?.focus();
+    handleQrSearch(qrSearch.value);
   });
+
+  searchQrBtn?.addEventListener('click', () => {
+    handleQrSearch(qrSearch?.value);
+  });
+
+  startScannerBtn?.addEventListener('click', startScanner);
+  stopScannerBtn?.addEventListener('click', stopScanner);
 
   form.addEventListener('submit', async event => {
     event.preventDefault();
@@ -554,7 +635,8 @@ function initGestionPage() {
   function clearForm() {
     form.reset();
     document.querySelector('#itemId').value = '';
-    document.querySelector('#itemBarcode').value = '';
+    document.querySelector('#itemInternalCode').value = '';
+    document.querySelector('#itemQrValue').value = '';
     document.querySelector('#formTitle').textContent = 'Ajouter un consommable';
     message.textContent = '';
     message.className = 'message';
@@ -563,7 +645,9 @@ function initGestionPage() {
   function fillForm(item) {
     document.querySelector('#formTitle').textContent = 'Modifier un consommable';
     document.querySelector('#itemId').value = item.$id;
-    document.querySelector('#itemBarcode').value = item.barcodeValue || '';
+    document.querySelector('#itemInternalCode').value = item.internalCode || '';
+    document.querySelector('#itemQrValue').value = item.barcodeValue || '';
+
     document.querySelector('#reference').value = item.itemCode || '';
     document.querySelector('#designation').value = item.itemName || '';
 
@@ -573,7 +657,6 @@ function initGestionPage() {
     }
 
     document.querySelector('#price').value = item.unitPrice || 0;
-    document.querySelector('#internalCode').value = item.internalCode || '';
     document.querySelector('#storageLocation').value = item.storageLocation || '';
     document.querySelector('#supplier').value = item.supplierName || '';
     document.querySelector('#contact').value = '';
@@ -596,14 +679,13 @@ function initGestionPage() {
         String(item.itemCode || '').toLowerCase().includes(term) ||
         String(item.itemName || '').toLowerCase().includes(term) ||
         String(item.category || '').toLowerCase().includes(term) ||
-        String(item.internalCode || '').toLowerCase().includes(term) ||
         String(item.barcodeValue || '').toLowerCase().includes(term) ||
         String(item.storageLocation || '').toLowerCase().includes(term) ||
         String(item.supplierName || '').toLowerCase().includes(term)
       );
 
       if (!filtered.length) {
-        table.innerHTML = '<tr><td colspan="10">Aucun consommable trouvé.</td></tr>';
+        table.innerHTML = '<tr><td colspan="9">Aucun consommable trouvé.</td></tr>';
         return;
       }
 
@@ -612,7 +694,6 @@ function initGestionPage() {
           <td>${escapeHtml(item.itemCode || '')}</td>
           <td>${escapeHtml(item.itemName || '')}</td>
           <td>${escapeHtml(item.category || '')}</td>
-          <td>${escapeHtml(item.internalCode || '')}</td>
           <td>${escapeHtml(item.storageLocation || '')}</td>
           <td>${escapeHtml(item.supplierName || '')}</td>
           <td>${escapeHtml(getSupplierEmail(item))}</td>
@@ -620,22 +701,22 @@ function initGestionPage() {
           <td>
             ${
               item.barcodeValue
-                ? `<svg data-barcode-value="${escapeHtml(item.barcodeValue)}"></svg>`
+                ? `<div class="qr-cell" data-qr-value="${escapeHtml(item.barcodeValue)}"></div>`
                 : '<span>À générer</span>'
             }
           </td>
           <td class="row-actions">
             <button class="btn secondary" type="button" data-edit="${item.$id}">Modifier</button>
-            <button class="btn warning" type="button" data-print="${item.$id}">Imprimer</button>
+            <button class="btn warning" type="button" data-print="${item.$id}">Imprimer QR</button>
             <button class="btn danger" type="button" data-delete="${item.$id}">Supprimer</button>
           </td>
         </tr>
       `).join('');
 
-      renderAllBarcodes();
+      renderAllQrCodes();
 
     } catch (error) {
-      table.innerHTML = `<tr><td colspan="10">Erreur Appwrite : ${escapeHtml(error.message)}</td></tr>`;
+      table.innerHTML = `<tr><td colspan="9">Erreur Appwrite : ${escapeHtml(error.message)}</td></tr>`;
       console.error(error);
     }
   }
@@ -652,7 +733,6 @@ function initGestionPage() {
     const itemName = document.querySelector('#designation').value.trim();
     const category = document.querySelector('#category')?.value || DEFAULT_CATEGORY;
     const unitPrice = safeNumber(document.querySelector('#price').value);
-    const internalCode = document.querySelector('#internalCode').value.trim();
     const storageLocation = document.querySelector('#storageLocation').value.trim();
 
     const supplierName = document.querySelector('#supplier').value.trim();
@@ -660,16 +740,21 @@ function initGestionPage() {
     const email = document.querySelector('#email').value.trim();
     const notes = document.querySelector('#notes').value.trim();
 
-    let barcodeValue = document.querySelector('#itemBarcode').value.trim();
+    let internalCode = document.querySelector('#itemInternalCode').value.trim();
+    let qrValue = document.querySelector('#itemQrValue').value.trim();
 
-    if (!itemCode || !itemName || !category || !supplierName || !email || !internalCode || !storageLocation) {
-      message.textContent = 'Veuillez remplir référence, désignation, catégorie, fournisseur, email, code interne et emplacement.';
+    if (!itemCode || !itemName || !category || !supplierName || !email || !storageLocation) {
+      message.textContent = 'Veuillez remplir référence, désignation, catégorie, fournisseur, email et emplacement.';
       message.classList.add('error');
       return;
     }
 
-    if (!barcodeValue) {
-      barcodeValue = generateBarcodeValue(itemCode, internalCode);
+    if (!internalCode) {
+      internalCode = generateInternalCode(itemCode);
+    }
+
+    if (!qrValue) {
+      qrValue = generateQrValue(internalCode);
     }
 
     try {
@@ -692,8 +777,8 @@ function initGestionPage() {
         supplierName,
         Email: email,
         internalCode,
-        storageLocation,
-        barcodeValue
+        barcodeValue: qrValue,
+        storageLocation
       };
 
       if (isNewItem) {
@@ -717,7 +802,7 @@ function initGestionPage() {
         );
       }
 
-      message.textContent = `Consommable enregistré avec succès. Code-barres : ${barcodeValue}`;
+      message.textContent = 'Consommable enregistré avec succès. QR code généré automatiquement.';
       message.classList.add('success');
 
       clearForm();
@@ -742,7 +827,7 @@ function initGestionPage() {
 
     if (printId) {
       const item = itemsCache.find(doc => doc.$id === printId);
-      if (item) printBarcode(item);
+      if (item) printQrCode(item);
     }
 
     if (deleteId) {
