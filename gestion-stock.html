@@ -10,7 +10,7 @@
   <header class="site-header">
     <div>
       <h1>Gestion du stock</h1>
-      <p>Création et modification des fournisseurs et consommables</p>
+      <p>Création et modification des fiches consommables</p>
     </div>
 
     <nav>
@@ -28,6 +28,34 @@
         <input type="hidden" id="itemId" />
 
         <label>
+          Référence
+          <input id="reference" type="text" placeholder="Ex : GANT-NIT-M" required />
+        </label>
+
+        <label>
+          Désignation
+          <input id="designation" type="text" placeholder="Ex : Gants nitrile stériles" required />
+        </label>
+
+        <label>
+          Catégorie
+          <select id="category" required>
+            <option value="consommable">Consommable</option>
+            <option value="reactif">Réactif</option>
+            <option value="piece_detachee">Pièce détachée</option>
+            <option value="equipement">Équipement</option>
+            <option value="sterilisation">Stérilisation</option>
+            <option value="maintenance">Maintenance</option>
+            <option value="autre">Autre</option>
+          </select>
+        </label>
+
+        <label>
+          Prix unitaire
+          <input id="price" type="number" min="0" step="0.01" value="0" required />
+        </label>
+
+        <label>
           Fournisseur
           <input id="supplier" type="text" placeholder="Ex : Medline" required />
         </label>
@@ -42,38 +70,13 @@
           <input id="email" type="email" placeholder="fournisseur@example.com" required />
         </label>
 
-        <label>
-          Référence
-          <input id="reference" type="text" placeholder="Ex : GANT-NIT-M" required />
-        </label>
-
-        <label>
-          Désignation
-          <input id="designation" type="text" placeholder="Ex : Gants nitrile taille M" required />
-        </label>
-
-        <label>
-          Prix unitaire
-          <input id="price" type="number" min="0" step="0.01" value="0" required />
-        </label>
-
-        <label>
-          Quantité initiale
-          <input id="quantity" type="number" min="0" value="0" required />
-        </label>
-
-        <label>
-          Seuil d’alerte
-          <input id="threshold" type="number" min="0" value="5" required />
-        </label>
-
         <label class="full">
           Notes
           <textarea id="notes" rows="3" placeholder="Informations complémentaires"></textarea>
         </label>
 
         <div class="form-actions full">
-          <button class="btn primary" type="submit">Enregistrer</button>
+          <button class="btn primary" type="submit">Enregistrer le consommable</button>
           <button id="resetBtn" class="btn secondary" type="button">Réinitialiser</button>
         </div>
       </form>
@@ -91,12 +94,12 @@
         <table>
           <thead>
             <tr>
-              <th>Fournisseur</th>
               <th>Référence</th>
               <th>Désignation</th>
+              <th>Catégorie</th>
+              <th>Fournisseur</th>
+              <th>Email</th>
               <th>Prix</th>
-              <th>Quantité</th>
-              <th>Seuil</th>
               <th>Actions</th>
             </tr>
           </thead>
