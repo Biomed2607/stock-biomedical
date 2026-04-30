@@ -167,10 +167,8 @@ function initStockPage() {
   const currentQtyInput = document.querySelector('#currentQty');
   const thresholdInput = document.querySelector('#stockThreshold');
   const stockTable = document.querySelector('#stockTable');
-  const alertsList = document.querySelector('#alertsList');
   const form = document.querySelector('#movementForm');
   const message = document.querySelector('#movementMessage');
-  const exportBtn = document.querySelector('#exportBtn');
 
   if (!itemSelect || !stockTable || !form) return;
 
@@ -194,18 +192,6 @@ function initStockPage() {
     }
   }
 
-  function getAlertItems() {
-    return itemsCache.filter(item => {
-      const qty = safeNumber(item.stockQuantity);
-      const threshold = safeNumber(item.alertThreshold);
-
-      if (qty <= 0) return true;
-      if (threshold > 0 && qty <= threshold) return true;
-
-      return false;
-    });
-  }
-
   async function renderStock() {
     try {
       itemsCache = await listItems();
@@ -217,7 +203,6 @@ function initStockPage() {
         if (thresholdInput) thresholdInput.value = 0;
 
         stockTable.innerHTML = '<tr><td colspan="7">Aucun consommable enregistré.</td></tr>';
-        alertsList.innerHTML = '<p>Aucune alerte.</p>';
         return;
       }
 
@@ -254,31 +239,9 @@ function initStockPage() {
         `;
       }).join('');
 
-      const alertItems = getAlertItems();
-
-      alertsList.innerHTML = alertItems.length
-        ? alertItems.map(item => {
-          const status = getStatus(item);
-
-          return `
-            <div class="alert">
-              <strong>${escapeHtml(item.itemName)}</strong>
-              <span class="status ${status.className}">${status.label}</span>
-              <br />
-              Référence : ${escapeHtml(item.itemCode)}<br />
-              Quantité actuelle : ${safeNumber(item.stockQuantity)}<br />
-              Seuil d’alerte : ${safeNumber(item.alertThreshold)}<br />
-              Fournisseur : ${escapeHtml(item.supplierName || '-')}<br />
-              Email fournisseur : ${escapeHtml(getSupplierEmail(item) || '-')}
-            </div>
-          `;
-        }).join('')
-        : '<p>Aucune alerte : tous les consommables sont au-dessus du seuil.</p>';
-
     } catch (error) {
       console.error(error);
       stockTable.innerHTML = '<tr><td colspan="7">Erreur de chargement Appwrite.</td></tr>';
-      alertsList.innerHTML = `<p class="message error">Erreur Appwrite : ${escapeHtml(error.message)}</p>`;
     }
   }
 
@@ -293,9 +256,7 @@ function initStockPage() {
     const documentId = itemSelect.value;
     const movementType = document.querySelector('#movementType').value;
     const movementQty = safeNumber(document.querySelector('#movementQty').value);
-    const newThreshold = thresholdInput
-      ? safeNumber(thresholdInput.value)
-      : 0;
+    const newThreshold = thresholdInput ? safeNumber(thresholdInput.value) : 0;
 
     const item = itemsCache.find(doc => doc.$id === documentId);
 
@@ -365,16 +326,6 @@ function initStockPage() {
 
       await renderStock();
 
-      if (status.label === 'Rupture' || status.label === 'Stock bas') {
-        const openEmail = confirm(
-          `Alerte ${status.label} pour ${item.itemName}. Voulez-vous ouvrir l’email fournisseur ?`
-        );
-
-        if (openEmail) {
-          window.location.href = mailtoFor(updatedItem);
-        }
-      }
-
       form.reset();
       updateSelectedItemInfo();
 
@@ -385,54 +336,8 @@ function initStockPage() {
     }
   });
 
-  exportBtn?.addEventListener('click', () => {
-    const header = [
-      'Référence',
-      'Désignation',
-      'Catégorie',
-      'Fournisseur',
-      'Email',
-      'Prix',
-      'Quantité',
-      'Seuil',
-      'Statut'
-    ];
-
-    const rows = itemsCache.map(item => {
-      const status = getStatus(item);
-
-      return [
-        item.itemCode || '',
-        item.itemName || '',
-        item.category || '',
-        item.supplierName || '',
-        getSupplierEmail(item),
-        item.unitPrice || 0,
-        item.stockQuantity || 0,
-        item.alertThreshold || 0,
-        status.label
-      ];
-    });
-
-    const csv = [header, ...rows]
-      .map(row =>
-        row.map(value => `"${String(value ?? '').replaceAll('"', '""')}"`).join(';')
-      )
-      .join('\n');
-
-    const blob = new Blob([csv], {
-      type: 'text/csv;charset=utf-8;'
-    });
-
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'stock-biomedical.csv';
-    link.click();
-  });
-
   renderStock();
 }
-
 // ==============================
 // PAGE GESTION DU STOCK
 // ==============================
