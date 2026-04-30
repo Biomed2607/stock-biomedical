@@ -14,7 +14,9 @@ const COLLECTIONS = {
   items: 'consommables',
   movements: 'mouvements_stock'
 };
-const DEFAULT_CATEGORY = 'Consommable';
+
+// Cette valeur doit exister dans l'enum Appwrite "category"
+const DEFAULT_CATEGORY = 'consommable';
 
 const client = new Client()
   .setEndpoint(APPWRITE_ENDPOINT)
@@ -55,7 +57,7 @@ function getStatus(item) {
     return { label: 'Rupture', className: 'out' };
   }
 
-  if (qty <= threshold) {
+  if (threshold > 0 && qty <= threshold) {
     return { label: 'Stock bas', className: 'low' };
   }
 
@@ -102,7 +104,7 @@ async function listItems() {
     DATABASE_ID,
     COLLECTIONS.items,
     [
-      Query.orderAsc('itemName'),
+      Query.orderAsc('itemCode'),
       Query.limit(100)
     ]
   );
@@ -207,9 +209,10 @@ function initStockPage() {
         `;
       }).join('');
 
-      const lowItems = itemsCache.filter(item =>
-        safeNumber(item.stockQuantity) <= safeNumber(item.alertThreshold)
-      );
+      const lowItems = itemsCache.filter(item => {
+        const threshold = safeNumber(item.alertThreshold);
+        return threshold > 0 && safeNumber(item.stockQuantity) <= threshold;
+      });
 
       alertsList.innerHTML = lowItems.length
         ? lowItems.map(item => `
@@ -311,9 +314,10 @@ function initStockPage() {
   });
 
   prepareAlertsBtn?.addEventListener('click', () => {
-    const firstLow = itemsCache.find(item =>
-      safeNumber(item.stockQuantity) <= safeNumber(item.alertThreshold)
-    );
+    const firstLow = itemsCache.find(item => {
+      const threshold = safeNumber(item.alertThreshold);
+      return threshold > 0 && safeNumber(item.stockQuantity) <= threshold;
+    });
 
     if (!firstLow) {
       alert('Aucune alerte à envoyer.');
@@ -325,25 +329,25 @@ function initStockPage() {
 
   exportBtn?.addEventListener('click', () => {
     const header = [
-      'Fournisseur',
-      'Email',
       'Référence',
       'Désignation',
+      'Catégorie',
+      'Fournisseur',
+      'Email',
       'Prix',
       'Quantité',
-      'Seuil',
-      'Catégorie'
+      'Seuil'
     ];
 
     const rows = itemsCache.map(item => [
-      item.supplierName || '',
-      getSupplierEmail(item),
       item.itemCode || '',
       item.itemName || '',
+      item.category || '',
+      item.supplierName || '',
+      getSupplierEmail(item),
       item.unitPrice || 0,
       item.stockQuantity || 0,
-      item.alertThreshold || 0,
-      item.category || ''
+      item.alertThreshold || 0
     ]);
 
     const csv = [header, ...rows]
@@ -391,14 +395,18 @@ function initGestionPage() {
   function fillForm(item) {
     document.querySelector('#formTitle').textContent = 'Modifier un consommable';
     document.querySelector('#itemId').value = item.$id;
+    document.querySelector('#reference').value = item.itemCode || '';
+    document.querySelector('#designation').value = item.itemName || '';
+
+    const categoryInput = document.querySelector('#category');
+    if (categoryInput) {
+      categoryInput.value = item.category || DEFAULT_CATEGORY;
+    }
+
+    document.querySelector('#price').value = item.unitPrice || 0;
     document.querySelector('#supplier').value = item.supplierName || '';
     document.querySelector('#contact').value = '';
     document.querySelector('#email').value = getSupplierEmail(item);
-    document.querySelector('#reference').value = item.itemCode || '';
-    document.querySelector('#designation').value = item.itemName || '';
-    document.querySelector('#price').value = item.unitPrice || 0;
-    document.querySelector('#quantity').value = item.stockQuantity || 0;
-    document.querySelector('#threshold').value = item.alertThreshold || 0;
     document.querySelector('#notes').value = '';
 
     window.scrollTo({
@@ -416,6 +424,7 @@ function initGestionPage() {
       const filtered = itemsCache.filter(item =>
         String(item.itemCode || '').toLowerCase().includes(term) ||
         String(item.itemName || '').toLowerCase().includes(term) ||
+        String(item.category || '').toLowerCase().includes(term) ||
         String(item.supplierName || '').toLowerCase().includes(term)
       );
 
@@ -426,15 +435,12 @@ function initGestionPage() {
 
       table.innerHTML = filtered.map(item => `
         <tr>
-          <td>
-            ${escapeHtml(item.supplierName || '')}<br />
-            <small>${escapeHtml(getSupplierEmail(item))}</small>
-          </td>
           <td>${escapeHtml(item.itemCode || '')}</td>
           <td>${escapeHtml(item.itemName || '')}</td>
+          <td>${escapeHtml(item.category || '')}</td>
+          <td>${escapeHtml(item.supplierName || '')}</td>
+          <td>${escapeHtml(getSupplierEmail(item))}</td>
           <td>${euro(item.unitPrice)}</td>
-          <td><strong>${safeNumber(item.stockQuantity)}</strong></td>
-          <td>${safeNumber(item.alertThreshold)}</td>
           <td class="row-actions">
             <button class="btn secondary" type="button" data-edit="${item.$id}">Modifier</button>
             <button class="btn danger" type="button" data-delete="${item.$id}">Supprimer</button>
@@ -455,19 +461,19 @@ function initGestionPage() {
     message.className = 'message';
 
     const documentId = document.querySelector('#itemId').value;
+
+    const itemCode = document.querySelector('#reference').value.trim();
+    const itemName = document.querySelector('#designation').value.trim();
+    const category = document.querySelector('#category')?.value || DEFAULT_CATEGORY;
+    const unitPrice = safeNumber(document.querySelector('#price').value);
+
     const supplierName = document.querySelector('#supplier').value.trim();
     const contact = document.querySelector('#contact').value.trim();
     const email = document.querySelector('#email').value.trim();
     const notes = document.querySelector('#notes').value.trim();
 
-    const itemCode = document.querySelector('#reference').value.trim();
-    const itemName = document.querySelector('#designation').value.trim();
-    const unitPrice = safeNumber(document.querySelector('#price').value);
-    const stockQuantity = safeNumber(document.querySelector('#quantity').value);
-    const alertThreshold = safeNumber(document.querySelector('#threshold').value);
-
-    if (!supplierName || !email || !itemCode || !itemName) {
-      message.textContent = 'Veuillez remplir fournisseur, email, référence et désignation.';
+    if (!itemCode || !itemName || !supplierName || !email) {
+      message.textContent = 'Veuillez remplir référence, désignation, fournisseur et email fournisseur.';
       message.classList.add('error');
       return;
     }
@@ -480,18 +486,23 @@ function initGestionPage() {
         notes
       });
 
+      const isNewItem = !documentId;
+
       const data = {
         itemName,
         itemCode,
-        category: DEFAULT_CATEGORY,
-        stockQuantity,
+        category,
         unitPrice,
         expirationDate: null,
-        alertThreshold,
         supplierId: supplierDoc.$id,
         supplierName,
         Email: email
       };
+
+      if (isNewItem) {
+        data.stockQuantity = 0;
+        data.alertThreshold = 0;
+      }
 
       if (documentId) {
         await databases.updateDocument(
