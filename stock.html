@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Stock — Stock Biomédical</title>
   <link rel="stylesheet" href="styles.css" />
+
+  <!-- Lecture/affichage des codes-barres -->
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 </head>
 <body>
   <header class="site-header">
@@ -25,6 +28,11 @@
       <h2>Gérer le stock</h2>
 
       <form id="movementForm" class="form-grid">
+        <label>
+          Scanner ou saisir le code-barres
+          <input id="barcodeSearch" type="text" placeholder="Scanner ou saisir le code-barres puis Entrée" />
+        </label>
+
         <label>
           Consommable
           <select id="itemSelect" required>
@@ -55,11 +63,17 @@
           <input id="movementQty" type="number" min="1" required />
         </label>
 
-        <div class="form-actions">
+        <label class="full">
+          Commentaire
+          <textarea id="movementComment" rows="2" placeholder="Commentaire facultatif"></textarea>
+        </label>
+
+        <div class="form-actions full">
           <button class="btn primary" type="submit">Valider le mouvement</button>
         </div>
       </form>
 
+      <p id="selectedItemInfo" class="message"></p>
       <p id="movementMessage" class="message"></p>
     </section>
 
@@ -72,6 +86,9 @@
             <tr>
               <th>Référence</th>
               <th>Désignation</th>
+              <th>Code interne</th>
+              <th>Code-barres</th>
+              <th>Emplacement</th>
               <th>Quantité</th>
               <th>Seuil</th>
               <th>Fournisseur</th>
@@ -81,7 +98,7 @@
           </thead>
           <tbody id="stockTable">
             <tr>
-              <td colspan="7">Chargement du stock...</td>
+              <td colspan="10">Chargement du stock...</td>
             </tr>
           </tbody>
         </table>
