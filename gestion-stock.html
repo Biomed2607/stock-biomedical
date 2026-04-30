@@ -6,8 +6,8 @@
   <title>Gestion du stock — Stock Biomédical</title>
   <link rel="stylesheet" href="styles.css" />
 
-  <!-- Génération des codes-barres -->
-  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+  <!-- Génération QR code -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 </head>
 <body>
   <header class="site-header">
@@ -29,7 +29,8 @@
 
       <form id="itemForm" class="form-grid">
         <input type="hidden" id="itemId" />
-        <input type="hidden" id="itemBarcode" />
+        <input type="hidden" id="itemInternalCode" />
+        <input type="hidden" id="itemQrValue" />
 
         <label>
           Référence
@@ -53,11 +54,6 @@
         <label>
           Prix unitaire
           <input id="price" type="number" min="0" step="0.01" value="0" required />
-        </label>
-
-        <label>
-          Code interne
-          <input id="internalCode" type="text" placeholder="Ex : INT-GANT-001" required />
         </label>
 
         <label>
@@ -107,18 +103,17 @@
               <th>Référence</th>
               <th>Désignation</th>
               <th>Catégorie</th>
-              <th>Code interne</th>
               <th>Emplacement</th>
               <th>Fournisseur</th>
               <th>Email</th>
               <th>Prix</th>
-              <th>Code-barres</th>
+              <th>QR code</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody id="itemsTable">
             <tr>
-              <td colspan="10">Chargement des consommables...</td>
+              <td colspan="9">Chargement des consommables...</td>
             </tr>
           </tbody>
         </table>
