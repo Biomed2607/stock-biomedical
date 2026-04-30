@@ -10,7 +10,7 @@
   <header class="site-header">
     <div>
       <h1>Stock</h1>
-      <p>Entrées, sorties et alertes de consommables</p>
+      <p>Gestion des entrées, sorties, seuils et ruptures de stock</p>
     </div>
 
     <nav>
@@ -22,7 +22,7 @@
 
   <main class="container">
     <section class="card">
-      <h2>Ajouter ou retirer un consommable</h2>
+      <h2>Gérer le stock</h2>
 
       <form id="movementForm" class="form-grid">
         <label>
@@ -30,6 +30,16 @@
           <select id="itemSelect" required>
             <option value="">Chargement...</option>
           </select>
+        </label>
+
+        <label>
+          Quantité actuelle
+          <input id="currentQty" type="number" value="0" readonly />
+        </label>
+
+        <label>
+          Seuil d’alerte
+          <input id="stockThreshold" type="number" min="0" value="0" required />
         </label>
 
         <label>
@@ -41,7 +51,7 @@
         </label>
 
         <label>
-          Quantité
+          Quantité à ajouter ou retirer
           <input id="movementQty" type="number" min="1" required />
         </label>
 
@@ -54,12 +64,7 @@
     </section>
 
     <section class="card">
-      <div class="section-header">
-        <h2>Alertes stock bas</h2>
-        <button id="prepareAlertsBtn" class="btn warning" type="button">
-          Préparer email fournisseur
-        </button>
-      </div>
+      <h2>Alertes de stock</h2>
 
       <div id="alertsList">
         <p>Chargement des alertes...</p>
@@ -97,6 +102,6 @@
     </section>
   </main>
 
- <script type="module" src="index.js"></script>
+  <script type="module" src="index.js"></script>
 </body>
 </html>
