@@ -15,7 +15,7 @@ const COLLECTIONS = {
   movements: 'mouvements_stock'
 };
 
-// Cette valeur doit exister dans l'enum Appwrite "category"
+// Valeurs acceptées dans Appwrite pour category : Consommable, piece_detachee, autre
 const DEFAULT_CATEGORY = 'Consommable';
 
 const client = new Client()
@@ -49,6 +49,10 @@ function safeNumber(value) {
   return Number.isFinite(number) ? number : 0;
 }
 
+function getSupplierEmail(item) {
+  return item.Email || item.supplierEmail || '';
+}
+
 function getStatus(item) {
   const qty = safeNumber(item.stockQuantity);
   const threshold = safeNumber(item.alertThreshold);
@@ -62,10 +66,6 @@ function getStatus(item) {
   }
 
   return { label: 'OK', className: 'ok' };
-}
-
-function getSupplierEmail(item) {
-  return item.Email || item.supplierEmail || '';
 }
 
 function mailtoFor(item) {
@@ -164,16 +164,47 @@ async function findOrCreateSupplier({ supplier, contact, email, notes }) {
 
 function initStockPage() {
   const itemSelect = document.querySelector('#itemSelect');
+  const currentQtyInput = document.querySelector('#currentQty');
+  const thresholdInput = document.querySelector('#stockThreshold');
   const stockTable = document.querySelector('#stockTable');
   const alertsList = document.querySelector('#alertsList');
   const form = document.querySelector('#movementForm');
   const message = document.querySelector('#movementMessage');
   const exportBtn = document.querySelector('#exportBtn');
-  const prepareAlertsBtn = document.querySelector('#prepareAlertsBtn');
 
   if (!itemSelect || !stockTable || !form) return;
 
   let itemsCache = [];
+
+  function updateSelectedItemInfo() {
+    const selectedItem = itemsCache.find(item => item.$id === itemSelect.value);
+
+    if (!selectedItem) {
+      if (currentQtyInput) currentQtyInput.value = 0;
+      if (thresholdInput) thresholdInput.value = 0;
+      return;
+    }
+
+    if (currentQtyInput) {
+      currentQtyInput.value = safeNumber(selectedItem.stockQuantity);
+    }
+
+    if (thresholdInput) {
+      thresholdInput.value = safeNumber(selectedItem.alertThreshold);
+    }
+  }
+
+  function getAlertItems() {
+    return itemsCache.filter(item => {
+      const qty = safeNumber(item.stockQuantity);
+      const threshold = safeNumber(item.alertThreshold);
+
+      if (qty <= 0) return true;
+      if (threshold > 0 && qty <= threshold) return true;
+
+      return false;
+    });
+  }
 
   async function renderStock() {
     try {
@@ -181,8 +212,12 @@ function initStockPage() {
 
       if (!itemsCache.length) {
         itemSelect.innerHTML = '<option value="">Aucun consommable</option>';
+
+        if (currentQtyInput) currentQtyInput.value = 0;
+        if (thresholdInput) thresholdInput.value = 0;
+
         stockTable.innerHTML = '<tr><td colspan="7">Aucun consommable enregistré.</td></tr>';
-        alertsList.innerHTML = '<p>Aucune donnée disponible.</p>';
+        alertsList.innerHTML = '<p>Aucune alerte.</p>';
         return;
       }
 
@@ -191,6 +226,8 @@ function initStockPage() {
           ${escapeHtml(item.itemCode)} — ${escapeHtml(item.itemName)}
         </option>
       `).join('');
+
+      updateSelectedItemInfo();
 
       stockTable.innerHTML = itemsCache.map(item => {
         const status = getStatus(item);
@@ -203,31 +240,39 @@ function initStockPage() {
             <td><strong>${safeNumber(item.stockQuantity)}</strong></td>
             <td>${safeNumber(item.alertThreshold)}</td>
             <td>${escapeHtml(item.supplierName || '')}</td>
-            <td><a href="mailto:${escapeHtml(supplierEmail)}">${escapeHtml(supplierEmail)}</a></td>
-            <td><span class="status ${status.className}">${status.label}</span></td>
+            <td>
+              <a href="mailto:${escapeHtml(supplierEmail)}">
+                ${escapeHtml(supplierEmail)}
+              </a>
+            </td>
+            <td>
+              <span class="status ${status.className}">
+                ${status.label}
+              </span>
+            </td>
           </tr>
         `;
       }).join('');
 
-      const lowItems = itemsCache.filter(item => {
-        const threshold = safeNumber(item.alertThreshold);
-        return threshold > 0 && safeNumber(item.stockQuantity) <= threshold;
-      });
+      const alertItems = getAlertItems();
 
-      alertsList.innerHTML = lowItems.length
-        ? lowItems.map(item => `
-          <div class="alert">
-            <strong>${escapeHtml(item.itemName)}</strong><br />
-            Référence : ${escapeHtml(item.itemCode)}<br />
-            Quantité actuelle : ${safeNumber(item.stockQuantity)}<br />
-            Seuil : ${safeNumber(item.alertThreshold)}<br />
-            Fournisseur : ${escapeHtml(item.supplierName || '-')}<br />
-            Email : ${escapeHtml(getSupplierEmail(item) || '-')}<br />
-            <a class="btn warning" href="${mailtoFor(item)}">
-              Envoyer une demande de devis
-            </a>
-          </div>
-        `).join('')
+      alertsList.innerHTML = alertItems.length
+        ? alertItems.map(item => {
+          const status = getStatus(item);
+
+          return `
+            <div class="alert">
+              <strong>${escapeHtml(item.itemName)}</strong>
+              <span class="status ${status.className}">${status.label}</span>
+              <br />
+              Référence : ${escapeHtml(item.itemCode)}<br />
+              Quantité actuelle : ${safeNumber(item.stockQuantity)}<br />
+              Seuil d’alerte : ${safeNumber(item.alertThreshold)}<br />
+              Fournisseur : ${escapeHtml(item.supplierName || '-')}<br />
+              Email fournisseur : ${escapeHtml(getSupplierEmail(item) || '-')}
+            </div>
+          `;
+        }).join('')
         : '<p>Aucune alerte : tous les consommables sont au-dessus du seuil.</p>';
 
     } catch (error) {
@@ -236,6 +281,8 @@ function initStockPage() {
       alertsList.innerHTML = `<p class="message error">Erreur Appwrite : ${escapeHtml(error.message)}</p>`;
     }
   }
+
+  itemSelect.addEventListener('change', updateSelectedItemInfo);
 
   form.addEventListener('submit', async event => {
     event.preventDefault();
@@ -246,6 +293,10 @@ function initStockPage() {
     const documentId = itemSelect.value;
     const movementType = document.querySelector('#movementType').value;
     const movementQty = safeNumber(document.querySelector('#movementQty').value);
+    const newThreshold = thresholdInput
+      ? safeNumber(thresholdInput.value)
+      : 0;
+
     const item = itemsCache.find(doc => doc.$id === documentId);
 
     if (!item) {
@@ -255,7 +306,7 @@ function initStockPage() {
     }
 
     if (movementQty <= 0) {
-      message.textContent = 'La quantité doit être supérieure à 0.';
+      message.textContent = 'La quantité du mouvement doit être supérieure à 0.';
       message.classList.add('error');
       return;
     }
@@ -278,7 +329,8 @@ function initStockPage() {
         COLLECTIONS.items,
         item.$id,
         {
-          stockQuantity: newQuantity
+          stockQuantity: newQuantity,
+          alertThreshold: newThreshold
         }
       );
 
@@ -300,31 +352,37 @@ function initStockPage() {
         }
       );
 
-      message.textContent = 'Stock mis à jour avec succès.';
+      const updatedItem = {
+        ...item,
+        stockQuantity: newQuantity,
+        alertThreshold: newThreshold
+      };
+
+      const status = getStatus(updatedItem);
+
+      message.textContent = `Stock mis à jour avec succès. Nouveau stock : ${newQuantity}. Statut : ${status.label}.`;
       message.classList.add('success');
 
-      form.reset();
       await renderStock();
+
+      if (status.label === 'Rupture' || status.label === 'Stock bas') {
+        const openEmail = confirm(
+          `Alerte ${status.label} pour ${item.itemName}. Voulez-vous ouvrir l’email fournisseur ?`
+        );
+
+        if (openEmail) {
+          window.location.href = mailtoFor(updatedItem);
+        }
+      }
+
+      form.reset();
+      updateSelectedItemInfo();
 
     } catch (error) {
       console.error(error);
       message.textContent = `Erreur Appwrite : ${error.message}`;
       message.classList.add('error');
     }
-  });
-
-  prepareAlertsBtn?.addEventListener('click', () => {
-    const firstLow = itemsCache.find(item => {
-      const threshold = safeNumber(item.alertThreshold);
-      return threshold > 0 && safeNumber(item.stockQuantity) <= threshold;
-    });
-
-    if (!firstLow) {
-      alert('Aucune alerte à envoyer.');
-      return;
-    }
-
-    window.location.href = mailtoFor(firstLow);
   });
 
   exportBtn?.addEventListener('click', () => {
@@ -336,19 +394,25 @@ function initStockPage() {
       'Email',
       'Prix',
       'Quantité',
-      'Seuil'
+      'Seuil',
+      'Statut'
     ];
 
-    const rows = itemsCache.map(item => [
-      item.itemCode || '',
-      item.itemName || '',
-      item.category || '',
-      item.supplierName || '',
-      getSupplierEmail(item),
-      item.unitPrice || 0,
-      item.stockQuantity || 0,
-      item.alertThreshold || 0
-    ]);
+    const rows = itemsCache.map(item => {
+      const status = getStatus(item);
+
+      return [
+        item.itemCode || '',
+        item.itemName || '',
+        item.category || '',
+        item.supplierName || '',
+        getSupplierEmail(item),
+        item.unitPrice || 0,
+        item.stockQuantity || 0,
+        item.alertThreshold || 0,
+        status.label
+      ];
+    });
 
     const csv = [header, ...rows]
       .map(row =>
@@ -570,6 +634,10 @@ function initGestionPage() {
 
 // ==============================
 // DÉMARRAGE
+// ==============================
+
+initStockPage();
+initGestionPage();
 // ==============================
 
 initStockPage();
