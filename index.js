@@ -447,6 +447,36 @@ function initStockPage() {
     }
   }
 
+  async function getBestCameraId() {
+    const cameras = await window.Html5Qrcode.getCameras();
+
+    if (!cameras || cameras.length === 0) {
+      return null;
+    }
+
+    const backCamera = cameras.find(camera => {
+      const label = String(camera.label || '').toLowerCase();
+
+      return (
+        label.includes('back') ||
+        label.includes('rear') ||
+        label.includes('environment') ||
+        label.includes('arrière') ||
+        label.includes('arriere')
+      );
+    });
+
+    if (backCamera) {
+      return backCamera.id;
+    }
+
+    if (cameras.length > 1) {
+      return cameras[cameras.length - 1].id;
+    }
+
+    return cameras[0].id;
+  }
+
   async function startScanner() {
     if (!qrReader) return;
 
@@ -455,33 +485,82 @@ function initStockPage() {
       return;
     }
 
-    if (scannerRunning) return;
+    if (scannerRunning) {
+      setScanMessage('La caméra est déjà ouverte.', 'success');
+      return;
+    }
 
     try {
+      setScanMessage('Demande d’accès à la caméra du téléphone...');
+
       qrScanner = new window.Html5Qrcode('qrReader');
 
+      const cameraId = await getBestCameraId();
+
+      if (!cameraId) {
+        setScanMessage(
+          'Aucune caméra détectée. Essayez depuis un téléphone avec caméra ou saisissez le QR code manuellement.',
+          'error'
+        );
+        return;
+      }
+
       await qrScanner.start(
-        { facingMode: 'environment' },
+        cameraId,
         {
           fps: 10,
-          qrbox: { width: 250, height: 250 }
+          qrbox: {
+            width: 260,
+            height: 260
+          },
+          aspectRatio: 1.777
         },
         decodedText => {
           handleQrSearch(decodedText);
+
+          if (navigator.vibrate) {
+            navigator.vibrate(120);
+          }
+        },
+        scanError => {
+          // On ignore les petites erreurs de lecture pendant le scan.
+          // Elles sont normales tant que le QR code n'est pas bien cadré.
         }
       );
 
       scannerRunning = true;
-      setScanMessage('Caméra active. Flashez un QR code.', 'success');
+      setScanMessage('Caméra active. Flashez le QR code avec le téléphone.', 'success');
 
     } catch (error) {
       console.error(error);
-      setScanMessage(`Erreur caméra : ${error.message || error}`, 'error');
+
+      const errorText = String(error?.message || error || '');
+
+      if (errorText.includes('Permission') || errorText.includes('NotAllowed')) {
+        setScanMessage(
+          'Accès caméra refusé. Autorisez la caméra dans les permissions du navigateur.',
+          'error'
+        );
+        return;
+      }
+
+      if (errorText.includes('NotFound') || errorText.includes('Requested device not found')) {
+        setScanMessage(
+          'Aucune caméra détectée sur cet appareil. Testez depuis un téléphone ou saisissez le QR code manuellement.',
+          'error'
+        );
+        return;
+      }
+
+      setScanMessage(`Erreur caméra : ${errorText}`, 'error');
     }
   }
 
   async function stopScanner() {
-    if (!qrScanner || !scannerRunning) return;
+    if (!qrScanner || !scannerRunning) {
+      setScanMessage('La caméra est déjà fermée.');
+      return;
+    }
 
     try {
       await qrScanner.stop();
@@ -616,7 +695,6 @@ function initStockPage() {
 
   renderStock();
 }
-
 // ==============================
 // PAGE GESTION DU STOCK
 // ==============================
