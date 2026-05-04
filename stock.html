@@ -27,16 +27,16 @@
     <section class="card">
       <h2>Scanner un QR code</h2>
 
-      <div class="form-grid">
+      <div class="form-grid scanner-grid">
         <label>
           Saisir ou scanner le QR code
           <input id="qrSearch" type="text" placeholder="Scanner ou saisir le QR code" />
         </label>
 
-        <div class="form-actions">
-          <button id="searchQrBtn" class="btn secondary" type="button">Rechercher</button>
-          <button id="startScannerBtn" class="btn primary" type="button">Ouvrir la caméra</button>
-          <button id="stopScannerBtn" class="btn danger" type="button">Fermer la caméra</button>
+        <div class="form-actions scanner-actions">
+          <button id="searchQrBtn" class="btn secondary small-btn" type="button">Rechercher</button>
+          <button id="startScannerBtn" class="btn primary small-btn" type="button">Ouvrir caméra</button>
+          <button id="stopScannerBtn" class="btn danger small-btn" type="button">Fermer caméra</button>
         </div>
       </div>
 
@@ -94,6 +94,7 @@
 
     <section class="card">
       <h2>État du stock</h2>
+      <p class="muted-text">Seuls les consommables en stock bas ou en rupture sont affichés ici.</p>
 
       <div class="table-wrapper">
         <table>
