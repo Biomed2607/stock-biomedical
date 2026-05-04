@@ -332,6 +332,7 @@ function initStockPage() {
   let itemsCache = [];
   let qrScanner = null;
   let scannerRunning = false;
+  let lastScannedValue = '';
 
   function setScanMessage(text, type = '') {
     if (!scanMessage) return;
@@ -364,8 +365,12 @@ function initStockPage() {
     if (qtyInput) qtyInput.focus();
   }
 
-  function handleQrSearch(value) {
-    const item = findItemByQr(value);
+  async function handleQrSearch(value, shouldStopCamera = false) {
+    const cleanValue = String(value || '').trim();
+
+    if (!cleanValue) return;
+
+    const item = findItemByQr(cleanValue);
 
     if (!item) {
       setScanMessage('Aucun consommable trouvé avec ce QR code.', 'error');
@@ -375,6 +380,10 @@ function initStockPage() {
     selectItem(item);
 
     if (qrSearch) qrSearch.value = '';
+
+    if (shouldStopCamera) {
+      await stopScanner();
+    }
   }
 
   function updateSelectedItemInfo() {
@@ -428,7 +437,17 @@ function initStockPage() {
 
       updateSelectedItemInfo();
 
-      stockTable.innerHTML = itemsCache.map(item => {
+      const stockAlerts = itemsCache.filter(item => {
+        const status = getStatus(item);
+        return status.label === 'Stock bas' || status.label === 'Rupture';
+      });
+
+      if (!stockAlerts.length) {
+        stockTable.innerHTML = '<tr><td colspan="10">Aucun consommable en stock bas ou en rupture.</td></tr>';
+        return;
+      }
+
+      stockTable.innerHTML = stockAlerts.map(item => {
         const status = getStatus(item);
         const supplierEmail = getSupplierEmail(item);
 
@@ -530,12 +549,18 @@ function initStockPage() {
           },
           aspectRatio: 1.777
         },
-        decodedText => {
-          handleQrSearch(decodedText);
+        async decodedText => {
+          const cleanDecoded = String(decodedText || '').trim();
+
+          if (!cleanDecoded || cleanDecoded === lastScannedValue) return;
+
+          lastScannedValue = cleanDecoded;
 
           if (navigator.vibrate) {
             navigator.vibrate(120);
           }
+
+          await handleQrSearch(cleanDecoded, true);
         }
       );
 
@@ -569,7 +594,6 @@ function initStockPage() {
 
   async function stopScanner() {
     if (!qrScanner || !scannerRunning) {
-      setScanMessage('La caméra est déjà fermée.');
       return;
     }
 
@@ -579,6 +603,7 @@ function initStockPage() {
 
       scannerRunning = false;
       qrScanner = null;
+      lastScannedValue = '';
 
       setScanMessage('Caméra fermée.');
 
@@ -594,11 +619,11 @@ function initStockPage() {
     if (event.key !== 'Enter') return;
 
     event.preventDefault();
-    handleQrSearch(qrSearch.value);
+    handleQrSearch(qrSearch.value, false);
   });
 
   searchQrBtn?.addEventListener('click', () => {
-    handleQrSearch(qrSearch?.value);
+    handleQrSearch(qrSearch?.value, false);
   });
 
   startScannerBtn?.addEventListener('click', startScanner);
@@ -717,6 +742,10 @@ function initGestionPage() {
   const message = document.querySelector('#formMessage');
   const resetBtn = document.querySelector('#resetBtn');
   const searchInput = document.querySelector('#searchInput');
+  const toggleListBtn = document.querySelector('#toggleListBtn');
+  const itemsListContainer = document.querySelector('#itemsListContainer');
+  const familyFilter = document.querySelector('#familyFilter');
+  const typeFilter = document.querySelector('#typeFilter');
 
   if (!form || !table) return;
 
@@ -767,17 +796,31 @@ function initGestionPage() {
       itemsCache = await listItems();
 
       const term = String(searchInput?.value || '').toLowerCase();
+      const familyValue = String(familyFilter?.value || '').toLowerCase();
+      const typeValue = String(typeFilter?.value || '').toLowerCase();
 
-      const filtered = itemsCache.filter(item =>
-        String(item.itemCode || '').toLowerCase().includes(term) ||
-        String(item.itemName || '').toLowerCase().includes(term) ||
-        String(item.equipmentFamily || '').toLowerCase().includes(term) ||
-        String(item.consumableType || '').toLowerCase().includes(term) ||
-        String(item.category || '').toLowerCase().includes(term) ||
-        String(item.barcodeValue || '').toLowerCase().includes(term) ||
-        String(item.storageLocation || '').toLowerCase().includes(term) ||
-        String(item.supplierName || '').toLowerCase().includes(term)
-      );
+      const filtered = itemsCache.filter(item => {
+        const matchesSearch =
+          String(item.itemCode || '').toLowerCase().includes(term) ||
+          String(item.itemName || '').toLowerCase().includes(term) ||
+          String(item.equipmentFamily || '').toLowerCase().includes(term) ||
+          String(item.consumableType || '').toLowerCase().includes(term) ||
+          String(item.category || '').toLowerCase().includes(term) ||
+          String(item.barcodeValue || '').toLowerCase().includes(term) ||
+          String(item.storageLocation || '').toLowerCase().includes(term) ||
+          String(item.supplierName || '').toLowerCase().includes(term) ||
+          String(getSupplierEmail(item) || '').toLowerCase().includes(term);
+
+        const matchesFamily =
+          !familyValue ||
+          String(item.equipmentFamily || '').toLowerCase() === familyValue;
+
+        const matchesType =
+          !typeValue ||
+          String(item.consumableType || '').toLowerCase() === typeValue;
+
+        return matchesSearch && matchesFamily && matchesType;
+      });
 
       if (!filtered.length) {
         table.innerHTML = '<tr><td colspan="11">Aucun consommable trouvé.</td></tr>';
@@ -951,8 +994,20 @@ function initGestionPage() {
     }
   });
 
+  toggleListBtn?.addEventListener('click', () => {
+    if (!itemsListContainer) return;
+
+    const isHidden = itemsListContainer.classList.toggle('hidden');
+
+    toggleListBtn.textContent = isHidden
+      ? 'Afficher les consommables'
+      : 'Masquer les consommables';
+  });
+
   resetBtn?.addEventListener('click', clearForm);
   searchInput?.addEventListener('input', renderGestion);
+  familyFilter?.addEventListener('change', renderGestion);
+  typeFilter?.addEventListener('change', renderGestion);
 
   renderGestion();
 }
