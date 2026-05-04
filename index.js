@@ -15,8 +15,9 @@ const COLLECTIONS = {
   movements: 'mouvements_stock'
 };
 
-// Valeurs acceptées dans Appwrite pour category : Consommable, piece_detachee, autre
 const DEFAULT_CATEGORY = 'Consommable';
+const DEFAULT_EQUIPMENT_FAMILY = 'Moniteur multiparamétrique';
+const DEFAULT_CONSUMABLE_TYPE = 'Capteur SpO2';
 
 const client = new Client()
   .setEndpoint(APPWRITE_ENDPOINT)
@@ -53,15 +54,19 @@ function normalizeCode(value) {
   return String(value || '')
     .trim()
     .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^A-Z0-9_-]/g, '');
 }
 
-function generateInternalCode(itemCode) {
-  const base = normalizeCode(itemCode || 'BIO');
+function generateInternalCode(itemCode, equipmentFamily, consumableType) {
+  const ref = normalizeCode(itemCode || 'BIO');
+  const family = normalizeCode(equipmentFamily || 'FAM').slice(0, 8);
+  const type = normalizeCode(consumableType || 'TYPE').slice(0, 8);
   const stamp = Date.now().toString(36).toUpperCase();
-  const random = Math.random().toString(36).slice(2, 7).toUpperCase();
+  const random = Math.random().toString(36).slice(2, 6).toUpperCase();
 
-  return `BIO-${base}-${stamp}-${random}`.slice(0, 100);
+  return `BIO-${family}-${type}-${ref}-${stamp}-${random}`.slice(0, 100);
 }
 
 function generateQrValue(internalCode) {
@@ -101,6 +106,8 @@ Nous souhaitons recevoir un devis ou organiser un réapprovisionnement pour le c
 
 Référence : ${item.itemCode}
 Désignation : ${item.itemName}
+Famille / équipement : ${item.equipmentFamily || '-'}
+Type de consommable : ${item.consumableType || '-'}
 QR code : ${item.barcodeValue || '-'}
 Emplacement : ${item.storageLocation || '-'}
 
@@ -147,6 +154,8 @@ function printQrCode(item) {
   const qrValue = item.barcodeValue || '';
   const itemCode = item.itemCode || '';
   const itemName = item.itemName || '';
+  const equipmentFamily = item.equipmentFamily || '';
+  const consumableType = item.consumableType || '';
   const storageLocation = item.storageLocation || '';
 
   if (!qrValue) {
@@ -176,7 +185,7 @@ function printQrCode(item) {
         }
 
         .label {
-          width: 340px;
+          width: 370px;
           border: 1px solid #111827;
           border-radius: 12px;
           padding: 18px;
@@ -210,6 +219,8 @@ function printQrCode(item) {
       <div class="label">
         <h1>${escapeHtml(itemName)}</h1>
         <p><strong>Référence :</strong> ${escapeHtml(itemCode)}</p>
+        <p><strong>Famille :</strong> ${escapeHtml(equipmentFamily)}</p>
+        <p><strong>Type :</strong> ${escapeHtml(consumableType)}</p>
         <p><strong>Emplacement :</strong> ${escapeHtml(storageLocation)}</p>
         <div id="qrcode"></div>
         <p>${escapeHtml(qrValue)}</p>
@@ -387,6 +398,8 @@ function initStockPage() {
     if (selectedItemInfo) {
       selectedItemInfo.innerHTML = `
         <strong>${escapeHtml(selectedItem.itemCode)} — ${escapeHtml(selectedItem.itemName)}</strong><br />
+        Famille : ${escapeHtml(selectedItem.equipmentFamily || '-')} |
+        Type : ${escapeHtml(selectedItem.consumableType || '-')} |
         Emplacement : ${escapeHtml(selectedItem.storageLocation || '-')} |
         QR code : ${escapeHtml(selectedItem.barcodeValue || '-')}
       `;
@@ -403,7 +416,7 @@ function initStockPage() {
         if (currentQtyInput) currentQtyInput.value = 0;
         if (thresholdInput) thresholdInput.value = 0;
 
-        stockTable.innerHTML = '<tr><td colspan="8">Aucun consommable enregistré.</td></tr>';
+        stockTable.innerHTML = '<tr><td colspan="10">Aucun consommable enregistré.</td></tr>';
         return;
       }
 
@@ -423,6 +436,8 @@ function initStockPage() {
           <tr>
             <td>${escapeHtml(item.itemCode)}</td>
             <td>${escapeHtml(item.itemName)}</td>
+            <td>${escapeHtml(item.equipmentFamily || '')}</td>
+            <td>${escapeHtml(item.consumableType || '')}</td>
             <td>${escapeHtml(item.storageLocation || '')}</td>
             <td><strong>${safeNumber(item.stockQuantity)}</strong></td>
             <td>${safeNumber(item.alertThreshold)}</td>
@@ -443,7 +458,7 @@ function initStockPage() {
 
     } catch (error) {
       console.error(error);
-      stockTable.innerHTML = '<tr><td colspan="8">Erreur de chargement Appwrite.</td></tr>';
+      stockTable.innerHTML = '<tr><td colspan="10">Erreur de chargement Appwrite.</td></tr>';
     }
   }
 
@@ -521,10 +536,6 @@ function initStockPage() {
           if (navigator.vibrate) {
             navigator.vibrate(120);
           }
-        },
-        scanError => {
-          // On ignore les petites erreurs de lecture pendant le scan.
-          // Elles sont normales tant que le QR code n'est pas bien cadré.
         }
       );
 
@@ -695,6 +706,7 @@ function initStockPage() {
 
   renderStock();
 }
+
 // ==============================
 // PAGE GESTION DU STOCK
 // ==============================
@@ -729,6 +741,9 @@ function initGestionPage() {
     document.querySelector('#reference').value = item.itemCode || '';
     document.querySelector('#designation').value = item.itemName || '';
 
+    document.querySelector('#equipmentFamily').value = item.equipmentFamily || DEFAULT_EQUIPMENT_FAMILY;
+    document.querySelector('#consumableType').value = item.consumableType || DEFAULT_CONSUMABLE_TYPE;
+
     const categoryInput = document.querySelector('#category');
     if (categoryInput) {
       categoryInput.value = item.category || DEFAULT_CATEGORY;
@@ -756,6 +771,8 @@ function initGestionPage() {
       const filtered = itemsCache.filter(item =>
         String(item.itemCode || '').toLowerCase().includes(term) ||
         String(item.itemName || '').toLowerCase().includes(term) ||
+        String(item.equipmentFamily || '').toLowerCase().includes(term) ||
+        String(item.consumableType || '').toLowerCase().includes(term) ||
         String(item.category || '').toLowerCase().includes(term) ||
         String(item.barcodeValue || '').toLowerCase().includes(term) ||
         String(item.storageLocation || '').toLowerCase().includes(term) ||
@@ -763,7 +780,7 @@ function initGestionPage() {
       );
 
       if (!filtered.length) {
-        table.innerHTML = '<tr><td colspan="9">Aucun consommable trouvé.</td></tr>';
+        table.innerHTML = '<tr><td colspan="11">Aucun consommable trouvé.</td></tr>';
         return;
       }
 
@@ -771,6 +788,8 @@ function initGestionPage() {
         <tr>
           <td>${escapeHtml(item.itemCode || '')}</td>
           <td>${escapeHtml(item.itemName || '')}</td>
+          <td>${escapeHtml(item.equipmentFamily || '')}</td>
+          <td>${escapeHtml(item.consumableType || '')}</td>
           <td>${escapeHtml(item.category || '')}</td>
           <td>${escapeHtml(item.storageLocation || '')}</td>
           <td>${escapeHtml(item.supplierName || '')}</td>
@@ -794,7 +813,7 @@ function initGestionPage() {
       renderAllQrCodes();
 
     } catch (error) {
-      table.innerHTML = `<tr><td colspan="9">Erreur Appwrite : ${escapeHtml(error.message)}</td></tr>`;
+      table.innerHTML = `<tr><td colspan="11">Erreur Appwrite : ${escapeHtml(error.message)}</td></tr>`;
       console.error(error);
     }
   }
@@ -809,6 +828,8 @@ function initGestionPage() {
 
     const itemCode = document.querySelector('#reference').value.trim();
     const itemName = document.querySelector('#designation').value.trim();
+    const equipmentFamily = document.querySelector('#equipmentFamily').value.trim();
+    const consumableType = document.querySelector('#consumableType').value.trim();
     const category = document.querySelector('#category')?.value || DEFAULT_CATEGORY;
     const unitPrice = safeNumber(document.querySelector('#price').value);
     const storageLocation = document.querySelector('#storageLocation').value.trim();
@@ -821,14 +842,14 @@ function initGestionPage() {
     let internalCode = document.querySelector('#itemInternalCode').value.trim();
     let qrValue = document.querySelector('#itemQrValue').value.trim();
 
-    if (!itemCode || !itemName || !category || !supplierName || !email || !storageLocation) {
-      message.textContent = 'Veuillez remplir référence, désignation, catégorie, fournisseur, email et emplacement.';
+    if (!itemCode || !itemName || !equipmentFamily || !consumableType || !category || !supplierName || !email || !storageLocation) {
+      message.textContent = 'Veuillez remplir référence, désignation, famille, type, catégorie, fournisseur, email et emplacement.';
       message.classList.add('error');
       return;
     }
 
     if (!internalCode) {
-      internalCode = generateInternalCode(itemCode);
+      internalCode = generateInternalCode(itemCode, equipmentFamily, consumableType);
     }
 
     if (!qrValue) {
@@ -848,6 +869,8 @@ function initGestionPage() {
       const data = {
         itemName,
         itemCode,
+        equipmentFamily,
+        consumableType,
         category,
         unitPrice,
         expirationDate: null,
