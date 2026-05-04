@@ -373,6 +373,11 @@ function initStockPage() {
 
     if (!item) {
       setScanMessage('Aucun consommable trouvé avec ce QR code.', 'error');
+
+      if (shouldStopCamera) {
+        await stopScanner(false);
+      }
+
       return;
     }
 
