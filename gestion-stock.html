@@ -119,32 +119,63 @@
     <section class="card">
       <div class="section-header">
         <h2>Liste des consommables</h2>
-        <input id="searchInput" class="search" type="search" placeholder="Rechercher..." />
+
+        <div class="list-tools">
+          <button id="toggleListBtn" class="btn secondary" type="button">
+            Afficher les consommables
+          </button>
+
+          <input id="searchInput" class="search" type="search" placeholder="Rechercher..." />
+
+          <select id="familyFilter">
+            <option value="">Toutes les familles</option>
+            <option value="Moniteur multiparamétrique">Moniteur multiparamétrique</option>
+            <option value="Électrochirurgie">Électrochirurgie</option>
+            <option value="Respiration / ventilation">Respiration / ventilation</option>
+            <option value="Imagerie">Imagerie</option>
+            <option value="Laboratoire">Laboratoire</option>
+            <option value="Autre">Autre</option>
+          </select>
+
+          <select id="typeFilter">
+            <option value="">Tous les types</option>
+            <option value="Capteur SpO2">Capteur SpO2</option>
+            <option value="ECG">ECG</option>
+            <option value="PNI">PNI</option>
+            <option value="Bistouri électrique">Bistouri électrique</option>
+            <option value="Câble patient">Câble patient</option>
+            <option value="Électrode">Électrode</option>
+            <option value="Sonde">Sonde</option>
+            <option value="Autre">Autre</option>
+          </select>
+        </div>
       </div>
 
-      <div class="table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th>Référence</th>
-              <th>Désignation</th>
-              <th>Famille</th>
-              <th>Type</th>
-              <th>Catégorie</th>
-              <th>Emplacement</th>
-              <th>Fournisseur</th>
-              <th>Email</th>
-              <th>Prix</th>
-              <th>QR code</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="itemsTable">
-            <tr>
-              <td colspan="11">Chargement des consommables...</td>
-            </tr>
-          </tbody>
-        </table>
+      <div id="itemsListContainer" class="hidden">
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Référence</th>
+                <th>Désignation</th>
+                <th>Famille</th>
+                <th>Type</th>
+                <th>Catégorie</th>
+                <th>Emplacement</th>
+                <th>Fournisseur</th>
+                <th>Email</th>
+                <th>Prix</th>
+                <th>QR code</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="itemsTable">
+              <tr>
+                <td colspan="11">Chargement des consommables...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
   </main>
