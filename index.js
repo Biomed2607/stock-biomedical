@@ -336,7 +336,6 @@ function initStockPage() {
 
   function setScanMessage(text, type = '') {
     if (!scanMessage) return;
-
     scanMessage.textContent = text;
     scanMessage.className = type ? `message ${type}` : 'message';
   }
@@ -377,13 +376,13 @@ function initStockPage() {
       return;
     }
 
+    if (shouldStopCamera) {
+      await stopScanner(false);
+    }
+
     selectItem(item);
 
     if (qrSearch) qrSearch.value = '';
-
-    if (shouldStopCamera) {
-      await stopScanner();
-    }
   }
 
   function updateSelectedItemInfo() {
@@ -438,8 +437,13 @@ function initStockPage() {
       updateSelectedItemInfo();
 
       const stockAlerts = itemsCache.filter(item => {
-        const status = getStatus(item);
-        return status.label === 'Stock bas' || status.label === 'Rupture';
+        const qty = safeNumber(item.stockQuantity);
+        const threshold = safeNumber(item.alertThreshold);
+
+        const isRupture = qty <= 0;
+        const isStockBas = threshold > 0 && qty > 0 && qty <= threshold;
+
+        return isRupture || isStockBas;
       });
 
       if (!stockAlerts.length) {
@@ -453,8 +457,8 @@ function initStockPage() {
 
         return `
           <tr>
-            <td>${escapeHtml(item.itemCode)}</td>
-            <td>${escapeHtml(item.itemName)}</td>
+            <td>${escapeHtml(item.itemCode || '')}</td>
+            <td>${escapeHtml(item.itemName || '')}</td>
             <td>${escapeHtml(item.equipmentFamily || '')}</td>
             <td>${escapeHtml(item.consumableType || '')}</td>
             <td>${escapeHtml(item.storageLocation || '')}</td>
@@ -500,13 +504,8 @@ function initStockPage() {
       );
     });
 
-    if (backCamera) {
-      return backCamera.id;
-    }
-
-    if (cameras.length > 1) {
-      return cameras[cameras.length - 1].id;
-    }
+    if (backCamera) return backCamera.id;
+    if (cameras.length > 1) return cameras[cameras.length - 1].id;
 
     return cameras[0].id;
   }
@@ -592,10 +591,8 @@ function initStockPage() {
     }
   }
 
-  async function stopScanner() {
-    if (!qrScanner || !scannerRunning) {
-      return;
-    }
+  async function stopScanner(showMessage = true) {
+    if (!qrScanner || !scannerRunning) return;
 
     try {
       await qrScanner.stop();
@@ -605,7 +602,9 @@ function initStockPage() {
       qrScanner = null;
       lastScannedValue = '';
 
-      setScanMessage('Caméra fermée.');
+      if (showMessage) {
+        setScanMessage('Caméra fermée.');
+      }
 
     } catch (error) {
       console.error(error);
@@ -627,7 +626,7 @@ function initStockPage() {
   });
 
   startScannerBtn?.addEventListener('click', startScanner);
-  stopScannerBtn?.addEventListener('click', stopScanner);
+  stopScannerBtn?.addEventListener('click', () => stopScanner(true));
 
   form.addEventListener('submit', async event => {
     event.preventDefault();
@@ -742,7 +741,7 @@ function initGestionPage() {
   const message = document.querySelector('#formMessage');
   const resetBtn = document.querySelector('#resetBtn');
   const searchInput = document.querySelector('#searchInput');
-  const toggleListBtn = document.querySelector('#toggleListBtn');
+  const showListRadio = document.querySelector('#showListRadio');
   const itemsListContainer = document.querySelector('#itemsListContainer');
   const familyFilter = document.querySelector('#familyFilter');
   const typeFilter = document.querySelector('#typeFilter');
@@ -784,6 +783,14 @@ function initGestionPage() {
     document.querySelector('#contact').value = '';
     document.querySelector('#email').value = getSupplierEmail(item);
     document.querySelector('#notes').value = '';
+
+    if (itemsListContainer) {
+      itemsListContainer.classList.add('hidden');
+    }
+
+    if (showListRadio) {
+      showListRadio.checked = false;
+    }
 
     window.scrollTo({
       top: 0,
@@ -994,14 +1001,14 @@ function initGestionPage() {
     }
   });
 
-  toggleListBtn?.addEventListener('click', () => {
+  showListRadio?.addEventListener('change', () => {
     if (!itemsListContainer) return;
 
-    const isHidden = itemsListContainer.classList.toggle('hidden');
-
-    toggleListBtn.textContent = isHidden
-      ? 'Afficher les consommables'
-      : 'Masquer les consommables';
+    if (showListRadio.checked) {
+      itemsListContainer.classList.remove('hidden');
+    } else {
+      itemsListContainer.classList.add('hidden');
+    }
   });
 
   resetBtn?.addEventListener('click', clearForm);
