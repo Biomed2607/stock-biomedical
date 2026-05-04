@@ -39,7 +39,33 @@
 
         <label>
           Désignation
-          <input id="designation" type="text" placeholder="Ex : Gants nitrile stériles" required />
+          <input id="designation" type="text" placeholder="Ex : Capteur SpO2 adulte" required />
+        </label>
+
+        <label>
+          Famille / équipement
+          <select id="equipmentFamily" required>
+            <option value="Moniteur multiparamétrique">Moniteur multiparamétrique</option>
+            <option value="Électrochirurgie">Électrochirurgie</option>
+            <option value="Respiration / ventilation">Respiration / ventilation</option>
+            <option value="Imagerie">Imagerie</option>
+            <option value="Laboratoire">Laboratoire</option>
+            <option value="Autre">Autre</option>
+          </select>
+        </label>
+
+        <label>
+          Type de consommable
+          <select id="consumableType" required>
+            <option value="Capteur SpO2">Capteur SpO2</option>
+            <option value="ECG">ECG</option>
+            <option value="PNI">PNI</option>
+            <option value="Bistouri électrique">Bistouri électrique</option>
+            <option value="Câble patient">Câble patient</option>
+            <option value="Électrode">Électrode</option>
+            <option value="Sonde">Sonde</option>
+            <option value="Autre">Autre</option>
+          </select>
         </label>
 
         <label>
@@ -102,6 +128,8 @@
             <tr>
               <th>Référence</th>
               <th>Désignation</th>
+              <th>Famille</th>
+              <th>Type</th>
               <th>Catégorie</th>
               <th>Emplacement</th>
               <th>Fournisseur</th>
@@ -113,7 +141,7 @@
           </thead>
           <tbody id="itemsTable">
             <tr>
-              <td colspan="9">Chargement des consommables...</td>
+              <td colspan="11">Chargement des consommables...</td>
             </tr>
           </tbody>
         </table>
