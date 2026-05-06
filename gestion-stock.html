@@ -83,6 +83,11 @@
         </label>
 
         <label>
+          Seuil d’alerte
+          <input id="alertThreshold" type="number" min="0" value="0" required />
+        </label>
+
+        <label>
           Emplacement
           <input id="storageLocation" type="text" placeholder="Ex : R1 - Étagère 1" required />
         </label>
@@ -163,6 +168,7 @@
                 <th>Type</th>
                 <th>Catégorie</th>
                 <th>Emplacement</th>
+                <th>Seuil</th>
                 <th>Fournisseur</th>
                 <th>Email</th>
                 <th>Prix</th>
@@ -172,7 +178,7 @@
             </thead>
             <tbody id="itemsTable">
               <tr>
-                <td colspan="11">Chargement des consommables...</td>
+                <td colspan="12">Chargement des consommables...</td>
               </tr>
             </tbody>
           </table>
