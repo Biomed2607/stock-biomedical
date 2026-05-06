@@ -718,25 +718,12 @@ function initStockPage() {
 
 function initStockPage() {
   const qrSearch = document.querySelector('#qrSearch');
-  const searchQrBtn = document.querySelector('#searchQrBtn');
-  const startScannerBtn = document.querySelector('#startScannerBtn');
-  const stopScannerBtn = document.querySelector('#stopScannerBtn');
-  const qrReader = document.querySelector('#qrReader');
-
-  const selectedStockBox = document.querySelector('#selectedStockBox');
-  const selectedItemTitle = document.querySelector('#selectedItemTitle');
-  const selectedItemDetails = document.querySelector('#selectedItemDetails');
-
-  const movementQtyInput = document.querySelector('#movementQty');
-  const movementCommentInput = document.querySelector('#movementComment');
+  const stockInfo = document.querySelector('#stockInfo');
   const addStockBtn = document.querySelector('#addStockBtn');
   const removeStockBtn = document.querySelector('#removeStockBtn');
+  const qrReader = document.querySelector('#qrReader');
 
-  const stockTable = document.querySelector('#stockTable');
-  const scanMessage = document.querySelector('#scanMessage');
-  const movementMessage = document.querySelector('#movementMessage');
-
-  if (!qrSearch || !stockTable) return;
+  if (!qrSearch || !stockInfo || !addStockBtn || !removeStockBtn) return;
 
   let itemsCache = [];
   let selectedItem = null;
@@ -744,45 +731,22 @@ function initStockPage() {
   let scannerRunning = false;
   let lastScannedValue = '';
 
-  function setScanMessage(text, type = '') {
-    if (!scanMessage) return;
-    scanMessage.textContent = text;
-    scanMessage.className = type ? `message ${type}` : 'message';
-  }
+  function setStockInfo(html, show = true) {
+    stockInfo.innerHTML = html || '';
 
-  function setMovementMessage(text, type = '') {
-    if (!movementMessage) return;
-    movementMessage.textContent = text;
-    movementMessage.className = type ? `message ${type}` : 'message';
+    if (show) {
+      stockInfo.classList.remove('hidden');
+    } else {
+      stockInfo.classList.add('hidden');
+    }
   }
 
   function clearSelectedItem() {
     selectedItem = null;
-
-    if (selectedStockBox) {
-      selectedStockBox.classList.add('hidden');
-    }
-
-    if (selectedItemTitle) {
-      selectedItemTitle.textContent = '';
-    }
-
-    if (selectedItemDetails) {
-      selectedItemDetails.textContent = '';
-    }
-
-    if (movementQtyInput) {
-      movementQtyInput.value = 1;
-    }
-
-    if (movementCommentInput) {
-      movementCommentInput.value = '';
-    }
-
-    setMovementMessage('');
+    setStockInfo('', false);
   }
 
-  function findItemByQr(value) {
+  function findItemByCode(value) {
     const search = String(value || '').trim().toLowerCase();
 
     if (!search) return null;
@@ -794,47 +758,36 @@ function initStockPage() {
     );
   }
 
-  function displaySelectedItem(item) {
-    selectedItem = item;
-
-    if (!selectedItem) {
+  function showSelectedItem(item, resultMessage = '') {
+    if (!item) {
       clearSelectedItem();
       return;
     }
 
-    const status = getStatus(selectedItem);
+    selectedItem = item;
 
-    if (selectedStockBox) {
-      selectedStockBox.classList.remove('hidden');
-    }
+    const status = getStatus(item);
+    const qty = safeNumber(item.stockQuantity);
 
-    if (selectedItemTitle) {
-      selectedItemTitle.textContent = `${selectedItem.itemCode || ''} — ${selectedItem.itemName || ''}`;
-    }
-
-    if (selectedItemDetails) {
-      selectedItemDetails.innerHTML = `
-        <strong>Stock actuel :</strong> ${safeNumber(selectedItem.stockQuantity)} |
-        <strong>Seuil :</strong> ${safeNumber(selectedItem.alertThreshold)} |
-        <strong>Statut :</strong> ${escapeHtml(status.label)}<br />
-        <strong>Emplacement :</strong> ${escapeHtml(selectedItem.storageLocation || '-')}<br />
-        <strong>Fournisseur :</strong> ${escapeHtml(selectedItem.supplierName || '-')}
-      `;
-    }
-
-    if (movementQtyInput) {
-      movementQtyInput.value = 1;
-      movementQtyInput.focus();
-    }
-
-    if (movementCommentInput) {
-      movementCommentInput.value = '';
-    }
-
-    setMovementMessage('');
+    setStockInfo(`
+      <strong>${escapeHtml(item.itemCode || '')} — ${escapeHtml(item.itemName || '')}</strong><br />
+      Stock actuel : <strong>${qty}</strong><br />
+      Quantité à ajouter/retirer : <strong>1</strong><br />
+      Statut : <strong>${escapeHtml(status.label)}</strong>
+      ${resultMessage ? `<br />${escapeHtml(resultMessage)}` : ''}
+    `);
   }
 
-  async function handleQrSearch(value, shouldStopCamera = false) {
+  async function loadItems() {
+    try {
+      itemsCache = await listItems();
+    } catch (error) {
+      console.error(error);
+      setStockInfo(`Erreur Appwrite : ${escapeHtml(error.message)}`);
+    }
+  }
+
+  async function handleCode(value, shouldStopCamera = false) {
     const cleanValue = String(value || '').trim();
 
     if (!cleanValue) return;
@@ -843,64 +796,88 @@ function initStockPage() {
       await stopScanner(false);
     }
 
-    const item = findItemByQr(cleanValue);
+    const item = findItemByCode(cleanValue);
 
     if (!item) {
       clearSelectedItem();
-      setScanMessage('Aucun consommable trouvé avec ce QR code.', 'error');
+      setStockInfo('Aucun consommable trouvé avec ce code.');
       return;
     }
 
-    displaySelectedItem(item);
-    setScanMessage(`Consommable trouvé : ${item.itemCode} — ${item.itemName}`, 'success');
+    showSelectedItem(item);
 
-    if (qrSearch) {
-      qrSearch.value = '';
-    }
+    qrSearch.value = '';
+    qrSearch.focus();
   }
 
-  async function renderStockAlerts() {
+  async function applyStockMovement(type) {
+    if (!selectedItem) {
+      setStockInfo('Scannez ou saisissez d’abord un code.');
+      qrSearch.focus();
+      return;
+    }
+
+    const oldQuantity = safeNumber(selectedItem.stockQuantity);
+
+    if (type === 'out' && oldQuantity <= 0) {
+      showSelectedItem(selectedItem, 'Retrait impossible : stock déjà à zéro.');
+      return;
+    }
+
+    const movementQty = 1;
+
+    const newQuantity = type === 'in'
+      ? oldQuantity + movementQty
+      : oldQuantity - movementQty;
+
     try {
-      itemsCache = await listItems();
+      await databases.updateDocument(
+        DATABASE_ID,
+        COLLECTIONS.items,
+        selectedItem.$id,
+        {
+          stockQuantity: newQuantity
+        }
+      );
 
-      const stockAlerts = itemsCache.filter(item => {
-        const qty = safeNumber(item.stockQuantity);
-        const threshold = safeNumber(item.alertThreshold);
+      await databases.createDocument(
+        DATABASE_ID,
+        COLLECTIONS.movements,
+        ID.unique(),
+        {
+          itemId: selectedItem.$id,
+          itemCode: selectedItem.itemCode,
+          itemName: selectedItem.itemName,
+          movementType: type === 'in' ? 'ENTREE' : 'SORTIE',
+          quantity: movementQty,
+          oldQuantity,
+          newQuantity,
+          date: new Date().toISOString(),
+          comment: '',
+          user: 'Utilisateur web'
+        }
+      );
 
-        const isRupture = qty <= 0;
-        const isStockBas = threshold > 0 && qty > 0 && qty <= threshold;
+      selectedItem = {
+        ...selectedItem,
+        stockQuantity: newQuantity
+      };
 
-        return isRupture || isStockBas;
-      });
+      itemsCache = itemsCache.map(item =>
+        item.$id === selectedItem.$id ? selectedItem : item
+      );
 
-      if (!stockAlerts.length) {
-        stockTable.innerHTML = '<tr><td colspan="7">Aucun consommable en stock bas ou en rupture.</td></tr>';
-        return;
-      }
+      const resultText = type === 'in'
+        ? `+1 ajouté. Nouveau stock : ${newQuantity}.`
+        : `−1 retiré. Nouveau stock : ${newQuantity}.`;
 
-      stockTable.innerHTML = stockAlerts.map(item => {
-        const status = getStatus(item);
+      showSelectedItem(selectedItem, resultText);
 
-        return `
-          <tr>
-            <td>${escapeHtml(item.itemCode || '')}</td>
-            <td>${escapeHtml(item.itemName || '')}</td>
-            <td>${escapeHtml(item.storageLocation || '')}</td>
-            <td><strong>${safeNumber(item.stockQuantity)}</strong></td>
-            <td>${safeNumber(item.alertThreshold)}</td>
-            <td>${escapeHtml(item.supplierName || '')}</td>
-            <td>
-              <span class="status ${status.className}">
-                ${status.label}
-              </span>
-            </td>
-          </tr>
-        `;
-      }).join('');
+      qrSearch.focus();
 
     } catch (error) {
       console.error(error);
-      stockTable.innerHTML = '<tr><td colspan="7">Erreur de chargement Appwrite.</td></tr>';
+      showSelectedItem(selectedItem, `Erreur Appwrite : ${error.message}`);
     }
   }
 
@@ -930,27 +907,17 @@ function initStockPage() {
   }
 
   async function startScanner() {
-    if (!qrReader) return;
+    if (!qrReader || !window.Html5Qrcode) return;
 
-    if (!window.Html5Qrcode) {
-      setScanMessage('Le module de scan QR code n’est pas disponible.', 'error');
-      return;
-    }
-
-    if (scannerRunning) {
-      setScanMessage('La caméra est déjà ouverte.', 'success');
-      return;
-    }
+    if (scannerRunning) return;
 
     try {
-      setScanMessage('Demande d’accès à la caméra...');
-
       qrScanner = new window.Html5Qrcode('qrReader');
 
       const cameraId = await getBestCameraId();
 
       if (!cameraId) {
-        setScanMessage('Aucune caméra détectée. Saisissez le QR code manuellement.', 'error');
+        setStockInfo('Aucune caméra détectée. Saisissez le code manuellement.');
         return;
       }
 
@@ -959,8 +926,8 @@ function initStockPage() {
         {
           fps: 10,
           qrbox: {
-            width: 260,
-            height: 260
+            width: 240,
+            height: 240
           }
         },
         async decodedText => {
@@ -974,20 +941,19 @@ function initStockPage() {
             navigator.vibrate(120);
           }
 
-          await handleQrSearch(cleanDecoded, true);
+          await handleCode(cleanDecoded, true);
         }
       );
 
       scannerRunning = true;
-      setScanMessage('Caméra active. Flashez le QR code.', 'success');
 
     } catch (error) {
       console.error(error);
-      setScanMessage(`Erreur caméra : ${error.message || error}`, 'error');
+      setStockInfo(`Erreur caméra : ${escapeHtml(error.message || error)}`);
     }
   }
 
-  async function stopScanner(showMessage = true) {
+  async function stopScanner() {
     if (!qrScanner || !scannerRunning) return;
 
     try {
@@ -998,125 +964,38 @@ function initStockPage() {
       qrScanner = null;
       lastScannedValue = '';
 
-      if (showMessage) {
-        setScanMessage('Caméra fermée.');
-      }
-
     } catch (error) {
       console.error(error);
-      setScanMessage(`Erreur fermeture caméra : ${error.message || error}`, 'error');
     }
   }
 
-  async function applyStockMovement(type) {
-    setMovementMessage('');
-
-    if (!selectedItem) {
-      setMovementMessage('Scannez ou saisissez d’abord un QR code.', 'error');
-      return;
-    }
-
-    const movementQty = safeNumber(movementQtyInput?.value);
-    const comment = movementCommentInput?.value.trim() || '';
-
-    if (movementQty <= 0) {
-      setMovementMessage('La quantité doit être supérieure à 0.', 'error');
-      return;
-    }
-
-    const oldQuantity = safeNumber(selectedItem.stockQuantity);
-
-    if (type === 'out' && movementQty > oldQuantity) {
-      setMovementMessage('Quantité insuffisante pour cette sortie.', 'error');
-      return;
-    }
-
-    const newQuantity = type === 'in'
-      ? oldQuantity + movementQty
-      : oldQuantity - movementQty;
-
-    try {
-      await databases.updateDocument(
-        DATABASE_ID,
-        COLLECTIONS.items,
-        selectedItem.$id,
-        {
-          stockQuantity: newQuantity
-        }
-      );
-
-      await databases.createDocument(
-        DATABASE_ID,
-        COLLECTIONS.movements,
-        ID.unique(),
-        {
-          itemId: selectedItem.$id,
-          itemCode: selectedItem.itemCode,
-          itemName: selectedItem.itemName,
-          movementType: type === 'in' ? 'ENTREE' : 'SORTIE',
-          quantity: movementQty,
-          oldQuantity,
-          newQuantity,
-          date: new Date().toISOString(),
-          comment,
-          user: 'Utilisateur web'
-        }
-      );
-
-      selectedItem = {
-        ...selectedItem,
-        stockQuantity: newQuantity
-      };
-
-      const status = getStatus(selectedItem);
-
-      setMovementMessage(
-        `${type === 'in' ? 'Ajout' : 'Retrait'} enregistré. Nouveau stock : ${newQuantity}. Statut : ${status.label}.`,
-        'success'
-      );
-
-      displaySelectedItem(selectedItem);
-
-      await renderStockAlerts();
-
-      if (status.label === 'Rupture' || status.label === 'Stock bas') {
-        const openEmail = confirm(
-          `Alerte ${status.label} pour ${selectedItem.itemName}. Voulez-vous ouvrir l’email fournisseur ?`
-        );
-
-        if (openEmail) {
-          window.location.href = mailtoFor(selectedItem);
-        }
-      }
-
-    } catch (error) {
-      console.error(error);
-      setMovementMessage(`Erreur Appwrite : ${error.message}`, 'error');
-    }
-  }
-
-  qrSearch?.addEventListener('input', () => {
+  qrSearch.addEventListener('input', () => {
     clearSelectedItem();
   });
 
-  qrSearch?.addEventListener('keydown', event => {
+  qrSearch.addEventListener('keydown', event => {
     if (event.key !== 'Enter') return;
 
     event.preventDefault();
-    handleQrSearch(qrSearch.value, false);
+    handleCode(qrSearch.value, false);
   });
 
-  searchQrBtn?.addEventListener('click', () => {
-    handleQrSearch(qrSearch?.value, false);
+  addStockBtn.addEventListener('click', () => {
+    applyStockMovement('in');
   });
 
-  startScannerBtn?.addEventListener('click', startScanner);
-  stopScannerBtn?.addEventListener('click', () => stopScanner(true));
+  removeStockBtn.addEventListener('click', () => {
+    applyStockMovement('out');
+  });
 
-  addStockBtn?.addEventListener('click', () => applyStockMovement('in'));
-  removeStockBtn?.addEventListener('click', () => applyStockMovement('out'));
+  qrSearch.addEventListener('focus', () => {
+    startScanner();
+  });
 
-  renderStockAlerts();
+  loadItems().then(() => {
+    qrSearch.focus();
+    startScanner();
+  });
 }
 // ==============================
 // DÉMARRAGE
