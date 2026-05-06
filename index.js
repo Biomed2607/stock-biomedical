@@ -320,12 +320,13 @@ function initStockPage() {
   const qrReader = document.querySelector('#qrReader');
 
   const currentQtyInput = document.querySelector('#currentQty');
-  const thresholdInput = document.querySelector('#stockThreshold');
   const stockTable = document.querySelector('#stockTable');
   const form = document.querySelector('#movementForm');
   const message = document.querySelector('#movementMessage');
   const scanMessage = document.querySelector('#scanMessage');
   const selectedItemInfo = document.querySelector('#selectedItemInfo');
+  const addStockBtn = document.querySelector('#addStockBtn');
+  const removeStockBtn = document.querySelector('#removeStockBtn');
 
   if (!itemSelect || !stockTable || !form) return;
 
@@ -371,18 +372,13 @@ function initStockPage() {
 
     const item = findItemByQr(cleanValue);
 
-    if (!item) {
-      setScanMessage('Aucun consommable trouvé avec ce QR code.', 'error');
-
-      if (shouldStopCamera) {
-        await stopScanner(false);
-      }
-
-      return;
-    }
-
     if (shouldStopCamera) {
       await stopScanner(false);
+    }
+
+    if (!item) {
+      setScanMessage('Aucun consommable trouvé avec ce QR code.', 'error');
+      return;
     }
 
     selectItem(item);
@@ -395,7 +391,6 @@ function initStockPage() {
 
     if (!selectedItem) {
       if (currentQtyInput) currentQtyInput.value = 0;
-      if (thresholdInput) thresholdInput.value = 0;
       if (selectedItemInfo) selectedItemInfo.textContent = '';
       return;
     }
@@ -404,17 +399,17 @@ function initStockPage() {
       currentQtyInput.value = safeNumber(selectedItem.stockQuantity);
     }
 
-    if (thresholdInput) {
-      thresholdInput.value = safeNumber(selectedItem.alertThreshold);
-    }
-
     if (selectedItemInfo) {
+      const status = getStatus(selectedItem);
+
       selectedItemInfo.innerHTML = `
         <strong>${escapeHtml(selectedItem.itemCode)} — ${escapeHtml(selectedItem.itemName)}</strong><br />
         Famille : ${escapeHtml(selectedItem.equipmentFamily || '-')} |
         Type : ${escapeHtml(selectedItem.consumableType || '-')} |
-        Emplacement : ${escapeHtml(selectedItem.storageLocation || '-')} |
-        QR code : ${escapeHtml(selectedItem.barcodeValue || '-')}
+        Emplacement : ${escapeHtml(selectedItem.storageLocation || '-')}<br />
+        Quantité : ${safeNumber(selectedItem.stockQuantity)} |
+        Seuil : ${safeNumber(selectedItem.alertThreshold)} |
+        Statut : <strong>${escapeHtml(status.label)}</strong>
       `;
     }
   }
@@ -427,7 +422,6 @@ function initStockPage() {
         itemSelect.innerHTML = '<option value="">Aucun consommable</option>';
 
         if (currentQtyInput) currentQtyInput.value = 0;
-        if (thresholdInput) thresholdInput.value = 0;
 
         stockTable.innerHTML = '<tr><td colspan="10">Aucun consommable enregistré.</td></tr>';
         return;
@@ -573,26 +567,7 @@ function initStockPage() {
 
     } catch (error) {
       console.error(error);
-
-      const errorText = String(error?.message || error || '');
-
-      if (errorText.includes('Permission') || errorText.includes('NotAllowed')) {
-        setScanMessage(
-          'Accès caméra refusé. Autorisez la caméra dans les permissions du navigateur.',
-          'error'
-        );
-        return;
-      }
-
-      if (errorText.includes('NotFound') || errorText.includes('Requested device not found')) {
-        setScanMessage(
-          'Aucune caméra détectée sur cet appareil. Testez depuis un téléphone ou saisissez le QR code manuellement.',
-          'error'
-        );
-        return;
-      }
-
-      setScanMessage(`Erreur caméra : ${errorText}`, 'error');
+      setScanMessage(`Erreur caméra : ${error.message || error}`, 'error');
     }
   }
 
@@ -617,6 +592,100 @@ function initStockPage() {
     }
   }
 
+  async function applyStockMovement(type) {
+    message.textContent = '';
+    message.className = 'message';
+
+    const documentId = itemSelect.value;
+    const movementQty = safeNumber(document.querySelector('#movementQty').value);
+    const comment = document.querySelector('#movementComment')?.value.trim() || '';
+
+    const item = itemsCache.find(doc => doc.$id === documentId);
+
+    if (!item) {
+      message.textContent = 'Veuillez choisir un consommable.';
+      message.classList.add('error');
+      return;
+    }
+
+    if (movementQty <= 0) {
+      message.textContent = 'La quantité doit être supérieure à 0.';
+      message.classList.add('error');
+      return;
+    }
+
+    const oldQuantity = safeNumber(item.stockQuantity);
+
+    if (type === 'out' && movementQty > oldQuantity) {
+      message.textContent = 'Quantité insuffisante pour cette sortie.';
+      message.classList.add('error');
+      return;
+    }
+
+    const newQuantity = type === 'in'
+      ? oldQuantity + movementQty
+      : oldQuantity - movementQty;
+
+    try {
+      await databases.updateDocument(
+        DATABASE_ID,
+        COLLECTIONS.items,
+        item.$id,
+        {
+          stockQuantity: newQuantity
+        }
+      );
+
+      await databases.createDocument(
+        DATABASE_ID,
+        COLLECTIONS.movements,
+        ID.unique(),
+        {
+          itemId: item.$id,
+          itemCode: item.itemCode,
+          itemName: item.itemName,
+          movementType: type === 'in' ? 'ENTREE' : 'SORTIE',
+          quantity: movementQty,
+          oldQuantity,
+          newQuantity,
+          date: new Date().toISOString(),
+          comment,
+          user: 'Utilisateur web'
+        }
+      );
+
+      const updatedItem = {
+        ...item,
+        stockQuantity: newQuantity
+      };
+
+      const status = getStatus(updatedItem);
+
+      message.textContent = `Mouvement enregistré. Nouveau stock : ${newQuantity}. Statut : ${status.label}.`;
+      message.classList.add('success');
+
+      document.querySelector('#movementQty').value = 1;
+      document.querySelector('#movementComment').value = '';
+
+      await renderStock();
+
+      if (status.label === 'Rupture' || status.label === 'Stock bas') {
+        const openEmail = confirm(
+          `Alerte ${status.label} pour ${item.itemName}. Voulez-vous ouvrir l’email fournisseur ?`
+        );
+
+        if (openEmail) {
+          window.location.href = mailtoFor(updatedItem);
+        }
+      }
+
+    } catch (error) {
+      console.error(error);
+      message.textContent = `Erreur Appwrite : ${error.message}`;
+      message.classList.add('error');
+    }
+  }
+
   itemSelect.addEventListener('change', updateSelectedItemInfo);
 
   qrSearch?.addEventListener('keydown', event => {
@@ -633,104 +702,11 @@ function initStockPage() {
   startScannerBtn?.addEventListener('click', startScanner);
   stopScannerBtn?.addEventListener('click', () => stopScanner(true));
 
-  form.addEventListener('submit', async event => {
+  addStockBtn?.addEventListener('click', () => applyStockMovement('in'));
+  removeStockBtn?.addEventListener('click', () => applyStockMovement('out'));
+
+  form.addEventListener('submit', event => {
     event.preventDefault();
-
-    message.textContent = '';
-    message.className = 'message';
-
-    const documentId = itemSelect.value;
-    const movementType = document.querySelector('#movementType').value;
-    const movementQty = safeNumber(document.querySelector('#movementQty').value);
-    const newThreshold = thresholdInput ? safeNumber(thresholdInput.value) : 0;
-    const comment = document.querySelector('#movementComment')?.value.trim() || '';
-
-    const item = itemsCache.find(doc => doc.$id === documentId);
-
-    if (!item) {
-      message.textContent = 'Veuillez choisir un consommable.';
-      message.classList.add('error');
-      return;
-    }
-
-    if (movementQty <= 0) {
-      message.textContent = 'La quantité du mouvement doit être supérieure à 0.';
-      message.classList.add('error');
-      return;
-    }
-
-    const oldQuantity = safeNumber(item.stockQuantity);
-
-    if (movementType === 'out' && movementQty > oldQuantity) {
-      message.textContent = 'Quantité insuffisante pour cette sortie.';
-      message.classList.add('error');
-      return;
-    }
-
-    const newQuantity = movementType === 'in'
-      ? oldQuantity + movementQty
-      : oldQuantity - movementQty;
-
-    try {
-      await databases.updateDocument(
-        DATABASE_ID,
-        COLLECTIONS.items,
-        item.$id,
-        {
-          stockQuantity: newQuantity,
-          alertThreshold: newThreshold
-        }
-      );
-
-      await databases.createDocument(
-        DATABASE_ID,
-        COLLECTIONS.movements,
-        ID.unique(),
-        {
-          itemId: item.$id,
-          itemCode: item.itemCode,
-          itemName: item.itemName,
-          movementType: movementType === 'in' ? 'ENTREE' : 'SORTIE',
-          quantity: movementQty,
-          oldQuantity,
-          newQuantity,
-          date: new Date().toISOString(),
-          comment,
-          user: 'Utilisateur web'
-        }
-      );
-
-      const updatedItem = {
-        ...item,
-        stockQuantity: newQuantity,
-        alertThreshold: newThreshold
-      };
-
-      const status = getStatus(updatedItem);
-
-      message.textContent = `Stock mis à jour avec succès. Nouveau stock : ${newQuantity}. Statut : ${status.label}.`;
-      message.classList.add('success');
-
-      await renderStock();
-
-      if (status.label === 'Rupture' || status.label === 'Stock bas') {
-        const openEmail = confirm(
-          `Alerte ${status.label} pour ${item.itemName}. Voulez-vous ouvrir l’email fournisseur ?`
-        );
-
-        if (openEmail) {
-          window.location.href = mailtoFor(updatedItem);
-        }
-      }
-
-      form.reset();
-      updateSelectedItemInfo();
-
-    } catch (error) {
-      console.error(error);
-      message.textContent = `Erreur Appwrite : ${error.message}`;
-      message.classList.add('error');
-    }
   });
 
   renderStock();
@@ -783,6 +759,7 @@ function initGestionPage() {
     }
 
     document.querySelector('#price').value = item.unitPrice || 0;
+    document.querySelector('#alertThreshold').value = safeNumber(item.alertThreshold);
     document.querySelector('#storageLocation').value = item.storageLocation || '';
     document.querySelector('#supplier').value = item.supplierName || '';
     document.querySelector('#contact').value = '';
@@ -835,7 +812,7 @@ function initGestionPage() {
       });
 
       if (!filtered.length) {
-        table.innerHTML = '<tr><td colspan="11">Aucun consommable trouvé.</td></tr>';
+        table.innerHTML = '<tr><td colspan="12">Aucun consommable trouvé.</td></tr>';
         return;
       }
 
@@ -847,6 +824,7 @@ function initGestionPage() {
           <td>${escapeHtml(item.consumableType || '')}</td>
           <td>${escapeHtml(item.category || '')}</td>
           <td>${escapeHtml(item.storageLocation || '')}</td>
+          <td>${safeNumber(item.alertThreshold)}</td>
           <td>${escapeHtml(item.supplierName || '')}</td>
           <td>${escapeHtml(getSupplierEmail(item))}</td>
           <td>${euro(item.unitPrice)}</td>
@@ -868,7 +846,7 @@ function initGestionPage() {
       renderAllQrCodes();
 
     } catch (error) {
-      table.innerHTML = `<tr><td colspan="11">Erreur Appwrite : ${escapeHtml(error.message)}</td></tr>`;
+      table.innerHTML = `<tr><td colspan="12">Erreur Appwrite : ${escapeHtml(error.message)}</td></tr>`;
       console.error(error);
     }
   }
@@ -887,6 +865,7 @@ function initGestionPage() {
     const consumableType = document.querySelector('#consumableType').value.trim();
     const category = document.querySelector('#category')?.value || DEFAULT_CATEGORY;
     const unitPrice = safeNumber(document.querySelector('#price').value);
+    const alertThreshold = safeNumber(document.querySelector('#alertThreshold').value);
     const storageLocation = document.querySelector('#storageLocation').value.trim();
 
     const supplierName = document.querySelector('#supplier').value.trim();
@@ -928,6 +907,7 @@ function initGestionPage() {
         consumableType,
         category,
         unitPrice,
+        alertThreshold,
         expirationDate: null,
         supplierId: supplierDoc.$id,
         supplierName,
@@ -939,7 +919,6 @@ function initGestionPage() {
 
       if (isNewItem) {
         data.stockQuantity = 0;
-        data.alertThreshold = 0;
       }
 
       if (documentId) {
