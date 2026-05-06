@@ -716,293 +716,408 @@ function initStockPage() {
 // PAGE GESTION DU STOCK
 // ==============================
 
-function initGestionPage() {
-  const form = document.querySelector('#itemForm');
-  const table = document.querySelector('#itemsTable');
-  const message = document.querySelector('#formMessage');
-  const resetBtn = document.querySelector('#resetBtn');
-  const searchInput = document.querySelector('#searchInput');
-  const showListRadio = document.querySelector('#showListRadio');
-  const itemsListContainer = document.querySelector('#itemsListContainer');
-  const familyFilter = document.querySelector('#familyFilter');
-  const typeFilter = document.querySelector('#typeFilter');
+function initStockPage() {
+  const qrSearch = document.querySelector('#qrSearch');
+  const searchQrBtn = document.querySelector('#searchQrBtn');
+  const startScannerBtn = document.querySelector('#startScannerBtn');
+  const stopScannerBtn = document.querySelector('#stopScannerBtn');
+  const qrReader = document.querySelector('#qrReader');
 
-  if (!form || !table) return;
+  const selectedStockBox = document.querySelector('#selectedStockBox');
+  const selectedItemTitle = document.querySelector('#selectedItemTitle');
+  const selectedItemDetails = document.querySelector('#selectedItemDetails');
+
+  const movementQtyInput = document.querySelector('#movementQty');
+  const movementCommentInput = document.querySelector('#movementComment');
+  const addStockBtn = document.querySelector('#addStockBtn');
+  const removeStockBtn = document.querySelector('#removeStockBtn');
+
+  const stockTable = document.querySelector('#stockTable');
+  const scanMessage = document.querySelector('#scanMessage');
+  const movementMessage = document.querySelector('#movementMessage');
+
+  if (!qrSearch || !stockTable) return;
 
   let itemsCache = [];
+  let selectedItem = null;
+  let qrScanner = null;
+  let scannerRunning = false;
+  let lastScannedValue = '';
 
-  function clearForm() {
-    form.reset();
-    document.querySelector('#itemId').value = '';
-    document.querySelector('#itemInternalCode').value = '';
-    document.querySelector('#itemQrValue').value = '';
-    document.querySelector('#formTitle').textContent = 'Ajouter un consommable';
-    message.textContent = '';
-    message.className = 'message';
+  function setScanMessage(text, type = '') {
+    if (!scanMessage) return;
+    scanMessage.textContent = text;
+    scanMessage.className = type ? `message ${type}` : 'message';
   }
 
-  function fillForm(item) {
-    document.querySelector('#formTitle').textContent = 'Modifier un consommable';
-    document.querySelector('#itemId').value = item.$id;
-    document.querySelector('#itemInternalCode').value = item.internalCode || '';
-    document.querySelector('#itemQrValue').value = item.barcodeValue || '';
-
-    document.querySelector('#reference').value = item.itemCode || '';
-    document.querySelector('#designation').value = item.itemName || '';
-
-    document.querySelector('#equipmentFamily').value = item.equipmentFamily || DEFAULT_EQUIPMENT_FAMILY;
-    document.querySelector('#consumableType').value = item.consumableType || DEFAULT_CONSUMABLE_TYPE;
-
-    const categoryInput = document.querySelector('#category');
-    if (categoryInput) {
-      categoryInput.value = item.category || DEFAULT_CATEGORY;
-    }
-
-    document.querySelector('#price').value = item.unitPrice || 0;
-    document.querySelector('#alertThreshold').value = safeNumber(item.alertThreshold);
-    document.querySelector('#storageLocation').value = item.storageLocation || '';
-    document.querySelector('#supplier').value = item.supplierName || '';
-    document.querySelector('#contact').value = '';
-    document.querySelector('#email').value = getSupplierEmail(item);
-    document.querySelector('#notes').value = '';
-
-    if (itemsListContainer) {
-      itemsListContainer.classList.add('hidden');
-    }
-
-    if (showListRadio) {
-      showListRadio.checked = false;
-    }
-
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth'
-    });
+  function setMovementMessage(text, type = '') {
+    if (!movementMessage) return;
+    movementMessage.textContent = text;
+    movementMessage.className = type ? `message ${type}` : 'message';
   }
 
-  async function renderGestion() {
-    try {
-      itemsCache = await listItems();
+  function clearSelectedItem() {
+    selectedItem = null;
 
-      const term = String(searchInput?.value || '').toLowerCase();
-      const familyValue = String(familyFilter?.value || '').toLowerCase();
-      const typeValue = String(typeFilter?.value || '').toLowerCase();
-
-      const filtered = itemsCache.filter(item => {
-        const matchesSearch =
-          String(item.itemCode || '').toLowerCase().includes(term) ||
-          String(item.itemName || '').toLowerCase().includes(term) ||
-          String(item.equipmentFamily || '').toLowerCase().includes(term) ||
-          String(item.consumableType || '').toLowerCase().includes(term) ||
-          String(item.category || '').toLowerCase().includes(term) ||
-          String(item.barcodeValue || '').toLowerCase().includes(term) ||
-          String(item.storageLocation || '').toLowerCase().includes(term) ||
-          String(item.supplierName || '').toLowerCase().includes(term) ||
-          String(getSupplierEmail(item) || '').toLowerCase().includes(term);
-
-        const matchesFamily =
-          !familyValue ||
-          String(item.equipmentFamily || '').toLowerCase() === familyValue;
-
-        const matchesType =
-          !typeValue ||
-          String(item.consumableType || '').toLowerCase() === typeValue;
-
-        return matchesSearch && matchesFamily && matchesType;
-      });
-
-      if (!filtered.length) {
-        table.innerHTML = '<tr><td colspan="12">Aucun consommable trouvé.</td></tr>';
-        return;
-      }
-
-      table.innerHTML = filtered.map(item => `
-        <tr>
-          <td>${escapeHtml(item.itemCode || '')}</td>
-          <td>${escapeHtml(item.itemName || '')}</td>
-          <td>${escapeHtml(item.equipmentFamily || '')}</td>
-          <td>${escapeHtml(item.consumableType || '')}</td>
-          <td>${escapeHtml(item.category || '')}</td>
-          <td>${escapeHtml(item.storageLocation || '')}</td>
-          <td>${safeNumber(item.alertThreshold)}</td>
-          <td>${escapeHtml(item.supplierName || '')}</td>
-          <td>${escapeHtml(getSupplierEmail(item))}</td>
-          <td>${euro(item.unitPrice)}</td>
-          <td>
-            ${
-              item.barcodeValue
-                ? `<div class="qr-cell" data-qr-value="${escapeHtml(item.barcodeValue)}"></div>`
-                : '<span>À générer</span>'
-            }
-          </td>
-          <td class="row-actions">
-            <button class="btn secondary" type="button" data-edit="${item.$id}">Modifier</button>
-            <button class="btn warning" type="button" data-print="${item.$id}">Imprimer QR</button>
-            <button class="btn danger" type="button" data-delete="${item.$id}">Supprimer</button>
-          </td>
-        </tr>
-      `).join('');
-
-      renderAllQrCodes();
-
-    } catch (error) {
-      table.innerHTML = `<tr><td colspan="12">Erreur Appwrite : ${escapeHtml(error.message)}</td></tr>`;
-      console.error(error);
+    if (selectedStockBox) {
+      selectedStockBox.classList.add('hidden');
     }
+
+    if (selectedItemTitle) {
+      selectedItemTitle.textContent = '';
+    }
+
+    if (selectedItemDetails) {
+      selectedItemDetails.textContent = '';
+    }
+
+    if (movementQtyInput) {
+      movementQtyInput.value = 1;
+    }
+
+    if (movementCommentInput) {
+      movementCommentInput.value = '';
+    }
+
+    setMovementMessage('');
   }
 
-  form.addEventListener('submit', async event => {
-    event.preventDefault();
+  function findItemByQr(value) {
+    const search = String(value || '').trim().toLowerCase();
 
-    message.textContent = '';
-    message.className = 'message';
+    if (!search) return null;
 
-    const documentId = document.querySelector('#itemId').value;
+    return itemsCache.find(item =>
+      String(item.barcodeValue || '').toLowerCase() === search ||
+      String(item.internalCode || '').toLowerCase() === search ||
+      String(item.itemCode || '').toLowerCase() === search
+    );
+  }
 
-    const itemCode = document.querySelector('#reference').value.trim();
-    const itemName = document.querySelector('#designation').value.trim();
-    const equipmentFamily = document.querySelector('#equipmentFamily').value.trim();
-    const consumableType = document.querySelector('#consumableType').value.trim();
-    const category = document.querySelector('#category')?.value || DEFAULT_CATEGORY;
-    const unitPrice = safeNumber(document.querySelector('#price').value);
-    const alertThreshold = safeNumber(document.querySelector('#alertThreshold').value);
-    const storageLocation = document.querySelector('#storageLocation').value.trim();
+  function displaySelectedItem(item) {
+    selectedItem = item;
 
-    const supplierName = document.querySelector('#supplier').value.trim();
-    const contact = document.querySelector('#contact').value.trim();
-    const email = document.querySelector('#email').value.trim();
-    const notes = document.querySelector('#notes').value.trim();
-
-    let internalCode = document.querySelector('#itemInternalCode').value.trim();
-    let qrValue = document.querySelector('#itemQrValue').value.trim();
-
-    if (!itemCode || !itemName || !equipmentFamily || !consumableType || !category || !supplierName || !email || !storageLocation) {
-      message.textContent = 'Veuillez remplir référence, désignation, famille, type, catégorie, fournisseur, email et emplacement.';
-      message.classList.add('error');
+    if (!selectedItem) {
+      clearSelectedItem();
       return;
     }
 
-    if (!internalCode) {
-      internalCode = generateInternalCode(itemCode, equipmentFamily, consumableType);
+    const status = getStatus(selectedItem);
+
+    if (selectedStockBox) {
+      selectedStockBox.classList.remove('hidden');
     }
 
-    if (!qrValue) {
-      qrValue = generateQrValue(internalCode);
+    if (selectedItemTitle) {
+      selectedItemTitle.textContent = `${selectedItem.itemCode || ''} — ${selectedItem.itemName || ''}`;
     }
 
+    if (selectedItemDetails) {
+      selectedItemDetails.innerHTML = `
+        <strong>Stock actuel :</strong> ${safeNumber(selectedItem.stockQuantity)} |
+        <strong>Seuil :</strong> ${safeNumber(selectedItem.alertThreshold)} |
+        <strong>Statut :</strong> ${escapeHtml(status.label)}<br />
+        <strong>Emplacement :</strong> ${escapeHtml(selectedItem.storageLocation || '-')}<br />
+        <strong>Fournisseur :</strong> ${escapeHtml(selectedItem.supplierName || '-')}
+      `;
+    }
+
+    if (movementQtyInput) {
+      movementQtyInput.value = 1;
+      movementQtyInput.focus();
+    }
+
+    if (movementCommentInput) {
+      movementCommentInput.value = '';
+    }
+
+    setMovementMessage('');
+  }
+
+  async function handleQrSearch(value, shouldStopCamera = false) {
+    const cleanValue = String(value || '').trim();
+
+    if (!cleanValue) return;
+
+    if (shouldStopCamera) {
+      await stopScanner(false);
+    }
+
+    const item = findItemByQr(cleanValue);
+
+    if (!item) {
+      clearSelectedItem();
+      setScanMessage('Aucun consommable trouvé avec ce QR code.', 'error');
+      return;
+    }
+
+    displaySelectedItem(item);
+    setScanMessage(`Consommable trouvé : ${item.itemCode} — ${item.itemName}`, 'success');
+
+    if (qrSearch) {
+      qrSearch.value = '';
+    }
+  }
+
+  async function renderStockAlerts() {
     try {
-      const supplierDoc = await findOrCreateSupplier({
-        supplier: supplierName,
-        contact,
-        email,
-        notes
+      itemsCache = await listItems();
+
+      const stockAlerts = itemsCache.filter(item => {
+        const qty = safeNumber(item.stockQuantity);
+        const threshold = safeNumber(item.alertThreshold);
+
+        const isRupture = qty <= 0;
+        const isStockBas = threshold > 0 && qty > 0 && qty <= threshold;
+
+        return isRupture || isStockBas;
       });
 
-      const isNewItem = !documentId;
-
-      const data = {
-        itemName,
-        itemCode,
-        equipmentFamily,
-        consumableType,
-        category,
-        unitPrice,
-        alertThreshold,
-        expirationDate: null,
-        supplierId: supplierDoc.$id,
-        supplierName,
-        Email: email,
-        internalCode,
-        barcodeValue: qrValue,
-        storageLocation
-      };
-
-      if (isNewItem) {
-        data.stockQuantity = 0;
+      if (!stockAlerts.length) {
+        stockTable.innerHTML = '<tr><td colspan="7">Aucun consommable en stock bas ou en rupture.</td></tr>';
+        return;
       }
 
-      if (documentId) {
-        await databases.updateDocument(
-          DATABASE_ID,
-          COLLECTIONS.items,
-          documentId,
-          data
-        );
-      } else {
-        await databases.createDocument(
-          DATABASE_ID,
-          COLLECTIONS.items,
-          ID.unique(),
-          data
-        );
-      }
+      stockTable.innerHTML = stockAlerts.map(item => {
+        const status = getStatus(item);
 
-      message.textContent = 'Consommable enregistré avec succès. QR code généré automatiquement.';
-      message.classList.add('success');
-
-      clearForm();
-      await renderGestion();
+        return `
+          <tr>
+            <td>${escapeHtml(item.itemCode || '')}</td>
+            <td>${escapeHtml(item.itemName || '')}</td>
+            <td>${escapeHtml(item.storageLocation || '')}</td>
+            <td><strong>${safeNumber(item.stockQuantity)}</strong></td>
+            <td>${safeNumber(item.alertThreshold)}</td>
+            <td>${escapeHtml(item.supplierName || '')}</td>
+            <td>
+              <span class="status ${status.className}">
+                ${status.label}
+              </span>
+            </td>
+          </tr>
+        `;
+      }).join('');
 
     } catch (error) {
       console.error(error);
-      message.textContent = `Erreur Appwrite : ${error.message}`;
-      message.classList.add('error');
+      stockTable.innerHTML = '<tr><td colspan="7">Erreur de chargement Appwrite.</td></tr>';
     }
-  });
+  }
 
-  table.addEventListener('click', async event => {
-    const editId = event.target.dataset.edit;
-    const printId = event.target.dataset.print;
-    const deleteId = event.target.dataset.delete;
+  async function getBestCameraId() {
+    const cameras = await window.Html5Qrcode.getCameras();
 
-    if (editId) {
-      const item = itemsCache.find(doc => doc.$id === editId);
-      if (item) fillForm(item);
+    if (!cameras || cameras.length === 0) {
+      return null;
     }
 
-    if (printId) {
-      const item = itemsCache.find(doc => doc.$id === printId);
-      if (item) printQrCode(item);
+    const backCamera = cameras.find(camera => {
+      const label = String(camera.label || '').toLowerCase();
+
+      return (
+        label.includes('back') ||
+        label.includes('rear') ||
+        label.includes('environment') ||
+        label.includes('arrière') ||
+        label.includes('arriere')
+      );
+    });
+
+    if (backCamera) return backCamera.id;
+    if (cameras.length > 1) return cameras[cameras.length - 1].id;
+
+    return cameras[0].id;
+  }
+
+  async function startScanner() {
+    if (!qrReader) return;
+
+    if (!window.Html5Qrcode) {
+      setScanMessage('Le module de scan QR code n’est pas disponible.', 'error');
+      return;
     }
 
-    if (deleteId) {
-      const confirmed = confirm('Supprimer ce consommable ?');
+    if (scannerRunning) {
+      setScanMessage('La caméra est déjà ouverte.', 'success');
+      return;
+    }
 
-      if (!confirmed) return;
+    try {
+      setScanMessage('Demande d’accès à la caméra...');
 
-      try {
-        await databases.deleteDocument(
-          DATABASE_ID,
-          COLLECTIONS.items,
-          deleteId
+      qrScanner = new window.Html5Qrcode('qrReader');
+
+      const cameraId = await getBestCameraId();
+
+      if (!cameraId) {
+        setScanMessage('Aucune caméra détectée. Saisissez le QR code manuellement.', 'error');
+        return;
+      }
+
+      await qrScanner.start(
+        cameraId,
+        {
+          fps: 10,
+          qrbox: {
+            width: 260,
+            height: 260
+          }
+        },
+        async decodedText => {
+          const cleanDecoded = String(decodedText || '').trim();
+
+          if (!cleanDecoded || cleanDecoded === lastScannedValue) return;
+
+          lastScannedValue = cleanDecoded;
+
+          if (navigator.vibrate) {
+            navigator.vibrate(120);
+          }
+
+          await handleQrSearch(cleanDecoded, true);
+        }
+      );
+
+      scannerRunning = true;
+      setScanMessage('Caméra active. Flashez le QR code.', 'success');
+
+    } catch (error) {
+      console.error(error);
+      setScanMessage(`Erreur caméra : ${error.message || error}`, 'error');
+    }
+  }
+
+  async function stopScanner(showMessage = true) {
+    if (!qrScanner || !scannerRunning) return;
+
+    try {
+      await qrScanner.stop();
+      await qrScanner.clear();
+
+      scannerRunning = false;
+      qrScanner = null;
+      lastScannedValue = '';
+
+      if (showMessage) {
+        setScanMessage('Caméra fermée.');
+      }
+
+    } catch (error) {
+      console.error(error);
+      setScanMessage(`Erreur fermeture caméra : ${error.message || error}`, 'error');
+    }
+  }
+
+  async function applyStockMovement(type) {
+    setMovementMessage('');
+
+    if (!selectedItem) {
+      setMovementMessage('Scannez ou saisissez d’abord un QR code.', 'error');
+      return;
+    }
+
+    const movementQty = safeNumber(movementQtyInput?.value);
+    const comment = movementCommentInput?.value.trim() || '';
+
+    if (movementQty <= 0) {
+      setMovementMessage('La quantité doit être supérieure à 0.', 'error');
+      return;
+    }
+
+    const oldQuantity = safeNumber(selectedItem.stockQuantity);
+
+    if (type === 'out' && movementQty > oldQuantity) {
+      setMovementMessage('Quantité insuffisante pour cette sortie.', 'error');
+      return;
+    }
+
+    const newQuantity = type === 'in'
+      ? oldQuantity + movementQty
+      : oldQuantity - movementQty;
+
+    try {
+      await databases.updateDocument(
+        DATABASE_ID,
+        COLLECTIONS.items,
+        selectedItem.$id,
+        {
+          stockQuantity: newQuantity
+        }
+      );
+
+      await databases.createDocument(
+        DATABASE_ID,
+        COLLECTIONS.movements,
+        ID.unique(),
+        {
+          itemId: selectedItem.$id,
+          itemCode: selectedItem.itemCode,
+          itemName: selectedItem.itemName,
+          movementType: type === 'in' ? 'ENTREE' : 'SORTIE',
+          quantity: movementQty,
+          oldQuantity,
+          newQuantity,
+          date: new Date().toISOString(),
+          comment,
+          user: 'Utilisateur web'
+        }
+      );
+
+      selectedItem = {
+        ...selectedItem,
+        stockQuantity: newQuantity
+      };
+
+      const status = getStatus(selectedItem);
+
+      setMovementMessage(
+        `${type === 'in' ? 'Ajout' : 'Retrait'} enregistré. Nouveau stock : ${newQuantity}. Statut : ${status.label}.`,
+        'success'
+      );
+
+      displaySelectedItem(selectedItem);
+
+      await renderStockAlerts();
+
+      if (status.label === 'Rupture' || status.label === 'Stock bas') {
+        const openEmail = confirm(
+          `Alerte ${status.label} pour ${selectedItem.itemName}. Voulez-vous ouvrir l’email fournisseur ?`
         );
 
-        await renderGestion();
-
-      } catch (error) {
-        alert(`Erreur Appwrite : ${error.message}`);
+        if (openEmail) {
+          window.location.href = mailtoFor(selectedItem);
+        }
       }
+
+    } catch (error) {
+      console.error(error);
+      setMovementMessage(`Erreur Appwrite : ${error.message}`, 'error');
     }
+  }
+
+  qrSearch?.addEventListener('input', () => {
+    clearSelectedItem();
   });
 
-  showListRadio?.addEventListener('change', () => {
-    if (!itemsListContainer) return;
+  qrSearch?.addEventListener('keydown', event => {
+    if (event.key !== 'Enter') return;
 
-    if (showListRadio.checked) {
-      itemsListContainer.classList.remove('hidden');
-    } else {
-      itemsListContainer.classList.add('hidden');
-    }
+    event.preventDefault();
+    handleQrSearch(qrSearch.value, false);
   });
 
-  resetBtn?.addEventListener('click', clearForm);
-  searchInput?.addEventListener('input', renderGestion);
-  familyFilter?.addEventListener('change', renderGestion);
-  typeFilter?.addEventListener('change', renderGestion);
+  searchQrBtn?.addEventListener('click', () => {
+    handleQrSearch(qrSearch?.value, false);
+  });
 
-  renderGestion();
+  startScannerBtn?.addEventListener('click', startScanner);
+  stopScannerBtn?.addEventListener('click', () => stopScanner(true));
+
+  addStockBtn?.addEventListener('click', () => applyStockMovement('in'));
+  removeStockBtn?.addEventListener('click', () => applyStockMovement('out'));
+
+  renderStockAlerts();
 }
-
 // ==============================
 // DÉMARRAGE
 // ==============================
