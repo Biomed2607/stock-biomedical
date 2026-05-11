@@ -900,3 +900,107 @@ footer {
   color: #ffffff;
   background: linear-gradient(135deg, var(--primary), var(--primary-dark));
 }
+
+/* ==============================
+   CORRECTION TABLES GESTION STOCK
+============================== */
+
+.gestion-toggle-header {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.gestion-toggle-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.gestion-view {
+  margin-top: 24px;
+}
+
+.gestion-view h3 {
+  margin-bottom: 16px;
+  color: var(--primary-dark);
+}
+
+.clean-table {
+  width: 100%;
+  table-layout: auto;
+  border-collapse: collapse;
+  min-width: 1180px;
+}
+
+.clean-table thead th {
+  white-space: nowrap;
+  background: #f8fbfc;
+  color: #0f172a;
+  font-size: 0.78rem;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 14px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.clean-table tbody td {
+  padding: 15px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+  color: #0f172a;
+  font-size: 0.93rem;
+}
+
+.clean-table tbody tr:hover {
+  background: #f8fbfc;
+}
+
+.clean-table td:nth-child(1),
+.clean-table th:nth-child(1) {
+  font-weight: 900;
+  color: #082f49;
+}
+
+.clean-table .row-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.clean-table .row-actions .btn {
+  min-height: 38px;
+  padding: 9px 12px;
+  white-space: nowrap;
+}
+
+#showItemsBtn.primary,
+#showStockBtn.primary {
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+}
+
+.muted-text {
+  color: var(--muted);
+  margin-top: -12px;
+  font-weight: 700;
+}
+
+@media (max-width: 800px) {
+  .clean-table {
+    min-width: 1080px;
+  }
+
+  .list-tools {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .list-tools input,
+  .list-tools select,
+  .list-tools button {
+    width: 100%;
+    max-width: none;
+  }
+}
