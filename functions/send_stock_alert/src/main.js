@@ -1,8 +1,6 @@
-import { Resend } from 'resend';
-
-export default async ({ req, res, log, error }) => {
+iexport default async ({ req, res, log, error }) => {
   try {
-    log('Function send_stock_alert démarrée avec Resend');
+    log('Function send_stock_alert démarrée avec Resend API');
 
     const resendApiKey = process.env.RESEND_API_KEY;
     const fromEmail = process.env.ALERT_FROM_EMAIL || 'onboarding@resend.dev';
@@ -29,8 +27,6 @@ export default async ({ req, res, log, error }) => {
       }, 400);
     }
 
-    const resend = new Resend(resendApiKey);
-
     const subject = `[Stock biomédical] ${status} — ${item.itemCode}`;
 
     const html = `
@@ -55,10 +51,10 @@ export default async ({ req, res, log, error }) => {
 
         <h3>Stock</h3>
         <ul>
-          <li><strong>Ancienne quantité :</strong> ${item.oldQuantity}</li>
-          <li><strong>Nouvelle quantité :</strong> ${item.newQuantity}</li>
-          <li><strong>Quantité actuelle :</strong> ${item.stockQuantity}</li>
-          <li><strong>Seuil d’alerte :</strong> ${item.alertThreshold}</li>
+          <li><strong>Ancienne quantité :</strong> ${item.oldQuantity ?? '-'}</li>
+          <li><strong>Nouvelle quantité :</strong> ${item.newQuantity ?? '-'}</li>
+          <li><strong>Quantité actuelle :</strong> ${item.stockQuantity ?? '-'}</li>
+          <li><strong>Seuil d’alerte :</strong> ${item.alertThreshold ?? '-'}</li>
         </ul>
 
         <h3>Fournisseur</h3>
@@ -67,68 +63,44 @@ export default async ({ req, res, log, error }) => {
           <li><strong>Email :</strong> ${item.supplierEmail || '-'}</li>
         </ul>
 
-        <p>
-          Merci de vérifier le besoin de réapprovisionnement ou de demande de devis.
-        </p>
+        <p>Merci de vérifier le besoin de réapprovisionnement ou de demande de devis.</p>
 
-        <p style="color:#64748b;">
-          Application Stock Biomédical
-        </p>
+        <p style="color:#64748b;">Application Stock Biomédical</p>
       </div>
     `;
 
-    const text = `
-Alerte stock biomédical
-
-Statut : ${status}
-Type de mouvement : ${movementType}
-
-Consommable :
-- Référence : ${item.itemCode}
-- Désignation : ${item.itemName}
-- Famille : ${item.equipmentFamily || '-'}
-- Type : ${item.consumableType || '-'}
-- Catégorie : ${item.category || '-'}
-- Emplacement : ${item.storageLocation || '-'}
-- QR code : ${item.barcodeValue || '-'}
-
-Stock :
-- Ancienne quantité : ${item.oldQuantity}
-- Nouvelle quantité : ${item.newQuantity}
-- Quantité actuelle : ${item.stockQuantity}
-- Seuil d’alerte : ${item.alertThreshold}
-
-Fournisseur :
-- Nom : ${item.supplierName || '-'}
-- Email : ${item.supplierEmail || '-'}
-
-Merci de vérifier le besoin de réapprovisionnement.
-`.trim();
-
-    const result = await resend.emails.send({
-      from: `Stock Biomédical <${fromEmail}>`,
-      to,
-      subject,
-      html,
-      text
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${resendApiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: `Stock Biomédical <${fromEmail}>`,
+        to: [to],
+        subject,
+        html
+      })
     });
 
-    if (result.error) {
-      error(`Erreur Resend : ${JSON.stringify(result.error)}`);
+    const result = await response.json();
+
+    if (!response.ok) {
+      error(`Erreur Resend : ${JSON.stringify(result)}`);
 
       return res.json({
         ok: false,
         message: 'Erreur Resend.',
-        error: result.error
+        error: result
       }, 500);
     }
 
-    log(`Email Resend envoyé : ${result.data?.id || 'id inconnu'}`);
+    log(`Email Resend envoyé : ${result.id}`);
 
     return res.json({
       ok: true,
       message: 'Alerte email envoyée avec Resend.',
-      id: result.data?.id || null
+      id: result.id
     });
 
   } catch (err) {
@@ -139,4 +111,5 @@ Merci de vérifier le besoin de réapprovisionnement.
       message: err.message
     }, 500);
   }
+};
 };
