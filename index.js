@@ -629,7 +629,6 @@ function initStockPage() {
 // ==============================
 // PAGE GESTION DU STOCK
 // ==============================
-
 function initGestionPage() {
   const form = document.querySelector('#itemForm');
   const table = document.querySelector('#itemsTable');
@@ -643,10 +642,14 @@ function initGestionPage() {
 
   const showItemsBtn = document.querySelector('#showItemsBtn');
   const showStockBtn = document.querySelector('#showStockBtn');
+  const sendStockAlertBtn = document.querySelector('#sendStockAlertBtn');
+
   const itemsListContainer = document.querySelector('#itemsListContainer');
   const stockListContainer = document.querySelector('#stockListContainer');
 
   if (!form) return;
+
+  const ALERT_EMAIL = 'alpha-balde@outlook.com';
 
   let itemsCache = [];
   let activeView = '';
@@ -768,9 +771,11 @@ function initGestionPage() {
     const filtered = getFilteredItems();
 
     const sortedItems = [...filtered].sort((a, b) => {
-      const aQty = safeNumber(a.stockQuantity);
-      const bQty = safeNumber(b.stockQuantity);
-      return aQty - bQty;
+      const statusPriority = statusRank(getStatus(a).label) - statusRank(getStatus(b).label);
+
+      if (statusPriority !== 0) return statusPriority;
+
+      return safeNumber(a.stockQuantity) - safeNumber(b.stockQuantity);
     });
 
     if (!sortedItems.length) {
@@ -796,6 +801,12 @@ function initGestionPage() {
         </tr>
       `;
     }).join('');
+  }
+
+  function statusRank(label) {
+    if (label === 'Rupture') return 1;
+    if (label === 'Stock bas') return 2;
+    return 3;
   }
 
   async function showItemsView() {
@@ -838,6 +849,51 @@ function initGestionPage() {
     if (activeView === 'stock') {
       renderStockTable();
     }
+  }
+
+  function prepareStockAlertEmail() {
+    const alertItems = itemsCache.filter(item => {
+      const status = getStatus(item);
+      return status.label === 'Rupture' || status.label === 'Stock bas';
+    });
+
+    if (!alertItems.length) {
+      alert('Aucun consommable en stock bas ou en rupture.');
+      return;
+    }
+
+    const subject = encodeURIComponent('Alerte stock biomédical - réapprovisionnement nécessaire');
+
+    const lines = alertItems.map(item => {
+      const status = getStatus(item);
+
+      return [
+        `- ${item.itemCode || ''} — ${item.itemName || ''}`,
+        `  Statut : ${status.label}`,
+        `  Stock actuel : ${safeNumber(item.stockQuantity)}`,
+        `  Seuil : ${safeNumber(item.alertThreshold)}`,
+        `  Emplacement : ${item.storageLocation || '-'}`,
+        `  Fournisseur : ${item.supplierName || '-'}`,
+        `  Email fournisseur : ${getSupplierEmail(item) || '-'}`,
+        ''
+      ].join('\n');
+    }).join('\n');
+
+    const body = encodeURIComponent(
+`Bonjour,
+
+Une alerte de stock nécessite un suivi.
+
+Consommables concernés :
+
+${lines}
+
+Merci de vérifier le besoin de réapprovisionnement et de lancer la demande de devis si nécessaire.
+
+Cordialement.`
+    );
+
+    window.location.href = `mailto:${ALERT_EMAIL}?subject=${subject}&body=${body}`;
   }
 
   form.addEventListener('submit', async event => {
@@ -984,8 +1040,8 @@ function initGestionPage() {
 
   showItemsBtn?.addEventListener('click', showItemsView);
   showStockBtn?.addEventListener('click', showStockView);
+  sendStockAlertBtn?.addEventListener('click', prepareStockAlertEmail);
 }
-
 // ==============================
 // DÉMARRAGE
 // ==============================
