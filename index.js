@@ -19,7 +19,7 @@ const DEFAULT_CATEGORY = 'Consommable';
 const DEFAULT_EQUIPMENT_FAMILY = 'Moniteur multiparamétrique';
 const DEFAULT_CONSUMABLE_TYPE = 'Capteur SpO2';
 
-const ALERT_FUNCTION_ID = 'send_stock_alert';
+const ALERT_FUNCTION_ID = '6a01cb32002e0eed267b';
 const ALERT_EMAIL = 'alpha.balde@ramsaysante.fr';
 
 const client = new Client()
