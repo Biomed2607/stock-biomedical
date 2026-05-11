@@ -1,4 +1,4 @@
-import { Client, Databases, ID, Query } from 'https://cdn.jsdelivr.net/npm/appwrite@15.0.0/+esm';
+import { Client, Databases, Functions, ID, Query } from 'https://cdn.jsdelivr.net/npm/appwrite@15.0.0/+esm';
 
 // ==============================
 // CONFIGURATION APPWRITE
@@ -24,6 +24,13 @@ const client = new Client()
   .setProject(APPWRITE_PROJECT_ID);
 
 const databases = new Databases(client);
+const functions = new Functions(client);
+
+// ID exact de la Function Appwrite à créer
+const ALERT_FUNCTION_ID = 'send_stock_alert';
+
+// Destinataire automatique des alertes stock
+const ALERT_EMAIL = 'alpha.balde@ramsaysante.fr';
 
 // ==============================
 // OUTILS
@@ -90,6 +97,12 @@ function getStatus(item) {
   }
 
   return { label: 'OK', className: 'ok' };
+}
+
+function statusRank(label) {
+  if (label === 'Rupture') return 1;
+  if (label === 'Stock bas') return 2;
+  return 3;
 }
 
 function mailtoFor(item) {
@@ -308,6 +321,59 @@ async function findOrCreateSupplier({ supplier, contact, email, notes }) {
 }
 
 // ==============================
+// ALERTE AUTOMATIQUE APPWRITE FUNCTION
+// ==============================
+
+async function sendAutomaticStockAlert(item, movementType, oldQuantity, newQuantity) {
+  const status = getStatus({
+    ...item,
+    stockQuantity: newQuantity
+  });
+
+  if (status.label !== 'Stock bas' && status.label !== 'Rupture') {
+    return false;
+  }
+
+  const payload = {
+    to: ALERT_EMAIL,
+    status: status.label,
+    movementType,
+    item: {
+      id: item.$id,
+      itemCode: item.itemCode || '',
+      itemName: item.itemName || '',
+      equipmentFamily: item.equipmentFamily || '',
+      consumableType: item.consumableType || '',
+      category: item.category || '',
+      storageLocation: item.storageLocation || '',
+      supplierName: item.supplierName || '',
+      supplierEmail: getSupplierEmail(item),
+      stockQuantity: newQuantity,
+      alertThreshold: safeNumber(item.alertThreshold),
+      oldQuantity,
+      newQuantity,
+      barcodeValue: item.barcodeValue || '',
+      internalCode: item.internalCode || ''
+    }
+  };
+
+  try {
+    await functions.createExecution({
+      functionId: ALERT_FUNCTION_ID,
+      body: JSON.stringify(payload),
+      async: true
+    });
+
+    console.log('Alerte stock envoyée via Appwrite Function.');
+    return true;
+
+  } catch (error) {
+    console.error('Erreur envoi alerte Appwrite Function :', error);
+    return false;
+  }
+}
+
+// ==============================
 // PAGE STOCK
 // ==============================
 
@@ -461,6 +527,13 @@ function initStockPage() {
         }
       );
 
+      const alertSent = await sendAutomaticStockAlert(
+        selectedItem,
+        type === 'in' ? 'ENTREE' : 'SORTIE',
+        oldQuantity,
+        newQuantity
+      );
+
       selectedItem = {
         ...selectedItem,
         stockQuantity: newQuantity
@@ -476,7 +549,11 @@ function initStockPage() {
         ? `Ajout confirmé : +1. Nouveau stock : ${newQuantity}.`
         : `Retrait confirmé : −1. Nouveau stock : ${newQuantity}.`;
 
-      showNotification(resultText, 'success');
+      const alertText = alertSent
+        ? ' Alerte email automatique envoyée.'
+        : '';
+
+      showNotification(resultText + alertText, 'success');
 
       qrSearch.focus();
 
@@ -629,6 +706,7 @@ function initStockPage() {
 // ==============================
 // PAGE GESTION DU STOCK
 // ==============================
+
 function initGestionPage() {
   const form = document.querySelector('#itemForm');
   const table = document.querySelector('#itemsTable');
@@ -648,8 +726,6 @@ function initGestionPage() {
   const stockListContainer = document.querySelector('#stockListContainer');
 
   if (!form) return;
-
-  const ALERT_EMAIL = 'alpha-balde@outlook.com';
 
   let itemsCache = [];
   let activeView = '';
@@ -803,12 +879,6 @@ function initGestionPage() {
     }).join('');
   }
 
-  function statusRank(label) {
-    if (label === 'Rupture') return 1;
-    if (label === 'Stock bas') return 2;
-    return 3;
-  }
-
   async function showItemsView() {
     activeView = 'items';
 
@@ -851,7 +921,7 @@ function initGestionPage() {
     }
   }
 
-  function prepareStockAlertEmail() {
+  async function sendManualStockAlerts() {
     const alertItems = itemsCache.filter(item => {
       const status = getStatus(item);
       return status.label === 'Rupture' || status.label === 'Stock bas';
@@ -862,38 +932,18 @@ function initGestionPage() {
       return;
     }
 
-    const subject = encodeURIComponent('Alerte stock biomédical - réapprovisionnement nécessaire');
+    let sentCount = 0;
 
-    const lines = alertItems.map(item => {
-      const status = getStatus(item);
+    for (const item of alertItems) {
+      const qty = safeNumber(item.stockQuantity);
+      const sent = await sendAutomaticStockAlert(item, 'ALERTE_MANUELLE', qty, qty);
 
-      return [
-        `- ${item.itemCode || ''} — ${item.itemName || ''}`,
-        `  Statut : ${status.label}`,
-        `  Stock actuel : ${safeNumber(item.stockQuantity)}`,
-        `  Seuil : ${safeNumber(item.alertThreshold)}`,
-        `  Emplacement : ${item.storageLocation || '-'}`,
-        `  Fournisseur : ${item.supplierName || '-'}`,
-        `  Email fournisseur : ${getSupplierEmail(item) || '-'}`,
-        ''
-      ].join('\n');
-    }).join('\n');
+      if (sent) {
+        sentCount += 1;
+      }
+    }
 
-    const body = encodeURIComponent(
-`Bonjour,
-
-Une alerte de stock nécessite un suivi.
-
-Consommables concernés :
-
-${lines}
-
-Merci de vérifier le besoin de réapprovisionnement et de lancer la demande de devis si nécessaire.
-
-Cordialement.`
-    );
-
-    window.location.href = `mailto:${ALERT_EMAIL}?subject=${subject}&body=${body}`;
+    alert(`${sentCount} alerte(s) envoyée(s) vers ${ALERT_EMAIL}.`);
   }
 
   form.addEventListener('submit', async event => {
@@ -1040,8 +1090,9 @@ Cordialement.`
 
   showItemsBtn?.addEventListener('click', showItemsView);
   showStockBtn?.addEventListener('click', showStockView);
-  sendStockAlertBtn?.addEventListener('click', prepareStockAlertEmail);
+  sendStockAlertBtn?.addEventListener('click', sendManualStockAlerts);
 }
+
 // ==============================
 // DÉMARRAGE
 // ==============================
