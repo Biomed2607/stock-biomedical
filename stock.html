@@ -1,71 +1,64 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestion de Stock</title>
-    <link rel="stylesheet" href="stock.css">
-    <script src="https://unpkg.com/html5-qrcode"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Stock — Stock Biomédical</title>
+
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- Scanner QR code -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
 </head>
-<body>
-    <div class="stock-container">
-        <!-- En-tête -->
-        <div class="header">
-            <h1>Gestion de Stock</h1>
-            <p class="subtitle">Scannez ou saisissez un code</p>
+
+<body class="stock-modern-body">
+  <main class="stock-modern-page">
+    <section class="stock-modern-card">
+      <header class="stock-modern-header">
+        <h1>Stock</h1>
+        <p>Scanner ou saisir un QR code pour ajouter ou retirer un article</p>
+      </header>
+
+      <div class="stock-scan-zone">
+        <input
+          id="qrSearch"
+          class="stock-modern-input"
+          type="text"
+          placeholder="Scanner ou saisir"
+          autocomplete="off"
+          autofocus
+        />
+
+        <div class="stock-camera-actions">
+          <button id="startScannerBtn" class="camera-btn open" type="button">
+            Ouvrir caméra
+          </button>
+
+          <button id="stopScannerBtn" class="camera-btn close" type="button">
+            Fermer caméra
+          </button>
         </div>
 
-        <!-- Zone de scan -->
-        <div class="scanner-section">
-            <div class="scanner-wrapper">
-                <input 
-                    type="text" 
-                    class="scan-input" 
-                    id="scanInput" 
-                    placeholder="Scanner ou saisir un code..."
-                    autocomplete="off"
-                    autofocus
-                />
-                <span class="scan-icon">📷</span>
-            </div>
+        <div id="qrReader" class="stock-qr-reader"></div>
+      </div>
 
-            <!-- Boutons caméra -->
-            <div class="camera-toggle">
-                <button class="btn-camera" id="startCameraBtn">
-                    <span>📸</span> Ouvrir caméra
-                </button>
-                <button class="btn-camera stop" id="stopCameraBtn" style="display: none;">
-                    <span>✕</span> Fermer caméra
-                </button>
-            </div>
+      <div class="stock-actions-modern">
+        <button id="removeStockBtn" class="stock-round-btn remove" type="button" title="Retirer un article">
+          −
+        </button>
 
-            <!-- Lecteur QR -->
-            <div class="qr-reader" id="qrReader"></div>
-        </div>
+        <button id="addStockBtn" class="stock-round-btn add" type="button" title="Ajouter un article">
+          +
+        </button>
+      </div>
 
-        <!-- Actions -->
-        <div class="actions-section">
-            <!-- Article scanné -->
-            <div class="current-item">
-                <div class="label">Article scanné</div>
-                <div class="code empty" id="currentCode">Aucun article</div>
-            </div>
+      <div id="stockInfo" class="stock-modern-info hidden">
+        Aucun article sélectionné.
+      </div>
+    </section>
+  </main>
 
-            <!-- Boutons + et - -->
-            <div class="btn-group">
-                <button class="btn-action btn-remove" id="removeBtn">
-                    <span>−</span>
-                </button>
-                <button class="btn-action btn-add" id="addBtn">
-                    <span>+</span>
-                </button>
-            </div>
-
-            <!-- Message de confirmation -->
-            <div class="notification" id="notification" style="display: none;"></div>
-        </div>
-    </div>
-
-    <script src="stock.js"></script>
+  <script type="module" src="index.js"></script>
 </body>
 </html>
