@@ -3,17 +3,20 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
   <title>Gestion du stock — Stock Biomédical</title>
+
   <link rel="stylesheet" href="styles.css" />
 
   <!-- Génération QR code -->
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 </head>
+
 <body>
   <header class="site-header">
     <div>
       <h1>Gestion du stock</h1>
-      <p>Création et modification des fiches consommables</p>
+      <p>Création, modification et suivi des fiches consommables</p>
     </div>
 
     <nav>
@@ -24,6 +27,7 @@
   </header>
 
   <main class="container">
+    <!-- FORMULAIRE CONSOMMABLE -->
     <section class="card">
       <h2 id="formTitle">Ajouter un consommable</h2>
 
@@ -121,43 +125,53 @@
       <p id="formMessage" class="message"></p>
     </section>
 
+    <!-- AFFICHAGES -->
     <section class="card">
-      <div class="section-header">
-        <h2>Liste des consommables</h2>
+      <div class="section-header gestion-toggle-header">
+        <h2>Consultation</h2>
 
-        <div class="list-tools">
-          <label class="radio-toggle">
-            <input id="showListRadio" type="checkbox" />
-            <span>Afficher les consommables</span>
-          </label>
+        <div class="gestion-toggle-actions">
+          <button id="showItemsBtn" class="btn secondary" type="button">
+            Afficher les consommables
+          </button>
 
-          <input id="searchInput" class="search" type="search" placeholder="Rechercher..." />
-
-          <select id="familyFilter">
-            <option value="">Toutes les familles</option>
-            <option value="Moniteur multiparamétrique">Moniteur multiparamétrique</option>
-            <option value="Électrochirurgie">Électrochirurgie</option>
-            <option value="Respiration / ventilation">Respiration / ventilation</option>
-            <option value="Imagerie">Imagerie</option>
-            <option value="Laboratoire">Laboratoire</option>
-            <option value="Autre">Autre</option>
-          </select>
-
-          <select id="typeFilter">
-            <option value="">Tous les types</option>
-            <option value="Capteur SpO2">Capteur SpO2</option>
-            <option value="ECG">ECG</option>
-            <option value="PNI">PNI</option>
-            <option value="Bistouri électrique">Bistouri électrique</option>
-            <option value="Câble patient">Câble patient</option>
-            <option value="Électrode">Électrode</option>
-            <option value="Sonde">Sonde</option>
-            <option value="Autre">Autre</option>
-          </select>
+          <button id="showStockBtn" class="btn secondary" type="button">
+            Afficher le stock
+          </button>
         </div>
       </div>
 
-      <div id="itemsListContainer" class="hidden">
+      <!-- FILTRES -->
+      <div class="list-tools">
+        <input id="searchInput" class="search" type="search" placeholder="Rechercher..." />
+
+        <select id="familyFilter">
+          <option value="">Toutes les familles</option>
+          <option value="Moniteur multiparamétrique">Moniteur multiparamétrique</option>
+          <option value="Électrochirurgie">Électrochirurgie</option>
+          <option value="Respiration / ventilation">Respiration / ventilation</option>
+          <option value="Imagerie">Imagerie</option>
+          <option value="Laboratoire">Laboratoire</option>
+          <option value="Autre">Autre</option>
+        </select>
+
+        <select id="typeFilter">
+          <option value="">Tous les types</option>
+          <option value="Capteur SpO2">Capteur SpO2</option>
+          <option value="ECG">ECG</option>
+          <option value="PNI">PNI</option>
+          <option value="Bistouri électrique">Bistouri électrique</option>
+          <option value="Câble patient">Câble patient</option>
+          <option value="Électrode">Électrode</option>
+          <option value="Sonde">Sonde</option>
+          <option value="Autre">Autre</option>
+        </select>
+      </div>
+
+      <!-- VUE CONSOMMABLES -->
+      <div id="itemsListContainer" class="gestion-view hidden">
+        <h3>Liste des consommables</h3>
+
         <div class="table-wrapper">
           <table>
             <thead>
@@ -176,9 +190,40 @@
                 <th>Actions</th>
               </tr>
             </thead>
+
             <tbody id="itemsTable">
               <tr>
-                <td colspan="12">Chargement des consommables...</td>
+                <td colspan="12">Cliquez sur “Afficher les consommables”.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- VUE STOCK -->
+      <div id="stockListContainer" class="gestion-view hidden">
+        <h3>État du stock</h3>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Stock</th>
+                <th>Statut</th>
+                <th>Référence</th>
+                <th>Désignation</th>
+                <th>Famille</th>
+                <th>Type</th>
+                <th>Seuil</th>
+                <th>Emplacement</th>
+                <th>Fournisseur</th>
+                <th>Email</th>
+              </tr>
+            </thead>
+
+            <tbody id="stockGestionTable">
+              <tr>
+                <td colspan="10">Cliquez sur “Afficher le stock”.</td>
               </tr>
             </tbody>
           </table>
