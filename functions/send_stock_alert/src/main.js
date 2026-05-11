@@ -2,6 +2,15 @@ import nodemailer from 'nodemailer';
 
 export default async ({ req, res, log, error }) => {
   try {
+    log('Function send_stock_alert démarrée');
+
+    log(`SMTP_HOST=${process.env.SMTP_HOST || 'NON DEFINI'}`);
+    log(`SMTP_PORT=${process.env.SMTP_PORT || 'NON DEFINI'}`);
+    log(`SMTP_SECURE=${process.env.SMTP_SECURE || 'NON DEFINI'}`);
+    log(`SMTP_USER=${process.env.SMTP_USER ? 'DEFINI' : 'NON DEFINI'}`);
+    log(`SMTP_FROM=${process.env.SMTP_FROM || 'NON DEFINI'}`);
+    log(`SMTP_REPLY_TO=${process.env.SMTP_REPLY_TO || 'NON DEFINI'}`);
+
     const payload = JSON.parse(req.body || '{}');
 
     const to = payload.to || 'alpha.balde@ramsaysante.fr';
@@ -23,8 +32,18 @@ export default async ({ req, res, log, error }) => {
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS
-      }
+      },
+
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000
     });
+
+    log('Test connexion SMTP...');
+
+    await transporter.verify();
+
+    log('Connexion SMTP OK');
 
     const subject = `[Stock biomédical] ${status} — ${item.itemCode}`;
 
@@ -77,7 +96,7 @@ Application Stock Biomédical
     });
 
   } catch (err) {
-    error(err.message);
+    error(`Erreur Function : ${err.message}`);
 
     return res.json({
       ok: false,
