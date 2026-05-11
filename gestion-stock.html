@@ -16,7 +16,7 @@
   <header class="site-header">
     <div>
       <h1>Gestion du stock</h1>
-      <p>Création, modification et suivi des fiches consommables</p>
+      <p>Création, modification et suivi des consommables biomédicaux</p>
     </div>
 
     <nav>
@@ -27,7 +27,6 @@
   </header>
 
   <main class="container">
-    <!-- FORMULAIRE CONSOMMABLE -->
     <section class="card">
       <h2 id="formTitle">Ajouter un consommable</h2>
 
@@ -38,12 +37,12 @@
 
         <label>
           Référence
-          <input id="reference" type="text" placeholder="Ex : GANT-NIT-M" required />
+          <input id="reference" type="text" placeholder="Ex : OM5402-BP44" required />
         </label>
 
         <label>
           Désignation
-          <input id="designation" type="text" placeholder="Ex : Capteur SpO2 adulte" required />
+          <input id="designation" type="text" placeholder="Ex : Brassard enfant" required />
         </label>
 
         <label>
@@ -98,7 +97,7 @@
 
         <label>
           Fournisseur
-          <input id="supplier" type="text" placeholder="Ex : Medline" required />
+          <input id="supplier" type="text" placeholder="Ex : Biomedisyst" required />
         </label>
 
         <label>
@@ -125,10 +124,12 @@
       <p id="formMessage" class="message"></p>
     </section>
 
-    <!-- AFFICHAGES -->
     <section class="card">
       <div class="section-header gestion-toggle-header">
-        <h2>Consultation</h2>
+        <div>
+          <h2>Consultation</h2>
+          <p class="muted-text">Afficher les fiches consommables ou l’état du stock.</p>
+        </div>
 
         <div class="gestion-toggle-actions">
           <button id="showItemsBtn" class="btn secondary" type="button">
@@ -141,7 +142,6 @@
         </div>
       </div>
 
-      <!-- FILTRES -->
       <div class="list-tools">
         <input id="searchInput" class="search" type="search" placeholder="Rechercher..." />
 
@@ -168,12 +168,13 @@
         </select>
       </div>
 
-      <!-- VUE CONSOMMABLES -->
       <div id="itemsListContainer" class="gestion-view hidden">
-        <h3>Liste des consommables</h3>
+        <div class="section-header">
+          <h3>Liste des consommables</h3>
+        </div>
 
         <div class="table-wrapper">
-          <table>
+          <table class="clean-table">
             <thead>
               <tr>
                 <th>Référence</th>
@@ -200,12 +201,17 @@
         </div>
       </div>
 
-      <!-- VUE STOCK -->
       <div id="stockListContainer" class="gestion-view hidden">
-        <h3>État du stock</h3>
+        <div class="section-header">
+          <h3>État du stock</h3>
+
+          <button id="sendStockAlertBtn" class="btn warning" type="button">
+            Préparer alerte email
+          </button>
+        </div>
 
         <div class="table-wrapper">
-          <table>
+          <table class="clean-table">
             <thead>
               <tr>
                 <th>Stock</th>
