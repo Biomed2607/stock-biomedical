@@ -26,10 +26,7 @@ const client = new Client()
 const databases = new Databases(client);
 const functions = new Functions(client);
 
-// Function Appwrite qui envoie les emails via Resend
 const ALERT_FUNCTION_ID = 'send_stock_alert';
-
-// Destinataire automatique des alertes stock
 const ALERT_EMAIL = 'alpha.balde@ramsaysante.fr';
 
 // ==============================
@@ -103,39 +100,6 @@ function statusRank(label) {
   if (label === 'Rupture') return 1;
   if (label === 'Stock bas') return 2;
   return 3;
-}
-
-function mailtoFor(item) {
-  const supplierEmail = getSupplierEmail(item);
-
-  const subject = encodeURIComponent(
-    `Demande de réapprovisionnement - ${item.itemName} (${item.itemCode})`
-  );
-
-  const body = encodeURIComponent(
-`Bonjour,
-
-Nous souhaitons recevoir un devis ou organiser un réapprovisionnement pour le consommable suivant :
-
-Référence : ${item.itemCode}
-Désignation : ${item.itemName}
-Famille / équipement : ${item.equipmentFamily || '-'}
-Type de consommable : ${item.consumableType || '-'}
-QR code : ${item.barcodeValue || '-'}
-Emplacement : ${item.storageLocation || '-'}
-
-Quantité actuelle : ${item.stockQuantity}
-Seuil d’alerte : ${item.alertThreshold}
-Prix connu : ${euro(item.unitPrice)}
-
-Fournisseur : ${item.supplierName || '-'}
-
-Merci de nous transmettre votre meilleure offre, le délai de livraison et le conditionnement.
-
-Cordialement.`
-  );
-
-  return `mailto:${supplierEmail}?subject=${subject}&body=${body}`;
 }
 
 function renderQrCode(element, value, size = 74) {
@@ -321,7 +285,7 @@ async function findOrCreateSupplier({ supplier, contact, email, notes }) {
 }
 
 // ==============================
-// ALERTE AUTOMATIQUE APPWRITE FUNCTION
+// ALERTE AUTOMATIQUE
 // ==============================
 
 async function sendAutomaticStockAlert(item, movementType, oldQuantity, newQuantity) {
@@ -330,7 +294,6 @@ async function sendAutomaticStockAlert(item, movementType, oldQuantity, newQuant
     stockQuantity: newQuantity
   });
 
-  // Envoi uniquement si stock bas ou rupture
   if (status.label !== 'Stock bas' && status.label !== 'Rupture') {
     return false;
   }
@@ -370,11 +333,11 @@ async function sendAutomaticStockAlert(item, movementType, oldQuantity, newQuant
       }
     );
 
-    console.log('Alerte stock envoyée automatiquement via Appwrite Function.');
+    console.log('Alerte stock envoyée automatiquement.');
     return true;
 
   } catch (error) {
-    console.error('Erreur envoi alerte Appwrite Function :', error);
+    console.error('Erreur alerte automatique :', error);
     return false;
   }
 }
@@ -387,6 +350,7 @@ function initStockPage() {
   const qrSearch = document.querySelector('#qrSearch');
   const currentCode = document.querySelector('#currentCode');
   const notification = document.querySelector('#stockNotification');
+  const pendingQuantity = document.querySelector('#pendingQuantity');
 
   const startScannerBtn = document.querySelector('#startScannerBtn');
   const stopScannerBtn = document.querySelector('#stopScannerBtn');
@@ -394,13 +358,24 @@ function initStockPage() {
 
   const addStockBtn = document.querySelector('#addStockBtn');
   const removeStockBtn = document.querySelector('#removeStockBtn');
+  const validateStockBtn = document.querySelector('#validateStockBtn');
 
-  if (!qrSearch || !currentCode || !notification || !addStockBtn || !removeStockBtn) {
+  if (
+    !qrSearch ||
+    !currentCode ||
+    !notification ||
+    !pendingQuantity ||
+    !addStockBtn ||
+    !removeStockBtn ||
+    !validateStockBtn
+  ) {
     return;
   }
 
   let itemsCache = [];
   let selectedItem = null;
+  let pendingDelta = 0;
+
   let qrScanner = null;
   let scannerRunning = false;
   let lastScannedValue = '';
@@ -417,10 +392,20 @@ function initStockPage() {
     notification.style.display = 'none';
   }
 
+  function updatePendingDisplay() {
+    pendingQuantity.textContent = String(pendingDelta);
+  }
+
+  function resetPending() {
+    pendingDelta = 0;
+    updatePendingDisplay();
+  }
+
   function clearSelectedItem() {
     selectedItem = null;
     currentCode.textContent = 'Aucun article';
     currentCode.classList.add('empty');
+    resetPending();
     hideNotification();
   }
 
@@ -479,33 +464,75 @@ function initStockPage() {
       return;
     }
 
+    resetPending();
     displaySelectedItem(item);
-    showNotification(`Article chargé : ${item.itemCode} — utilisez + ou −.`, 'success');
+    showNotification(`Article chargé : ${item.itemCode}. Choisissez + ou − puis validez.`, 'success');
 
     qrSearch.value = '';
     qrSearch.focus();
   }
 
-  async function applyStockMovement(type) {
+  function addPendingStock() {
     if (!selectedItem) {
       showNotification('Scannez ou saisissez d’abord un code.', 'error');
       qrSearch.focus();
       return;
     }
 
-    const oldQuantity = safeNumber(selectedItem.stockQuantity);
-    const movementQty = 1;
+    pendingDelta += 1;
+    updatePendingDisplay();
 
-    if (type === 'out' && oldQuantity <= 0) {
-      showNotification('Retrait impossible : stock déjà à zéro.', 'error');
+    showNotification(`Préparation : ajout de ${pendingDelta > 0 ? pendingDelta : 0} article(s).`, 'success');
+  }
+
+  function removePendingStock() {
+    if (!selectedItem) {
+      showNotification('Scannez ou saisissez d’abord un code.', 'error');
+      qrSearch.focus();
       return;
     }
 
-    const newQuantity = type === 'in'
-      ? oldQuantity + movementQty
-      : oldQuantity - movementQty;
+    const currentStock = safeNumber(selectedItem.stockQuantity);
+    const futureStock = currentStock + pendingDelta - 1;
+
+    if (futureStock < 0) {
+      showNotification('Retrait impossible : stock insuffisant.', 'error');
+      return;
+    }
+
+    pendingDelta -= 1;
+    updatePendingDisplay();
+
+    showNotification(`Préparation : retrait de ${Math.abs(pendingDelta)} article(s).`, 'warning');
+  }
+
+  async function validateStockMovement() {
+    if (!selectedItem) {
+      showNotification('Scannez ou saisissez d’abord un code.', 'error');
+      qrSearch.focus();
+      return;
+    }
+
+    if (pendingDelta === 0) {
+      showNotification('Aucun mouvement à valider. Utilisez + ou −.', 'warning');
+      return;
+    }
+
+    const oldQuantity = safeNumber(selectedItem.stockQuantity);
+    const newQuantity = oldQuantity + pendingDelta;
+
+    if (newQuantity < 0) {
+      showNotification('Validation impossible : stock négatif.', 'error');
+      return;
+    }
+
+    const movementType = pendingDelta > 0 ? 'ENTREE' : 'SORTIE';
+    const movementQty = Math.abs(pendingDelta);
 
     try {
+      validateStockBtn.disabled = true;
+      validateStockBtn.textContent = 'Validation...';
+
       await databases.updateDocument(
         DATABASE_ID,
         COLLECTIONS.items,
@@ -523,7 +550,7 @@ function initStockPage() {
           itemId: selectedItem.$id,
           itemCode: selectedItem.itemCode,
           itemName: selectedItem.itemName,
-          movementType: type === 'in' ? 'ENTREE' : 'SORTIE',
+          movementType,
           quantity: movementQty,
           oldQuantity,
           newQuantity,
@@ -535,7 +562,7 @@ function initStockPage() {
 
       const alertSent = await sendAutomaticStockAlert(
         selectedItem,
-        type === 'in' ? 'ENTREE' : 'SORTIE',
+        movementType,
         oldQuantity,
         newQuantity
       );
@@ -551,14 +578,17 @@ function initStockPage() {
 
       displaySelectedItem(selectedItem);
 
-      const resultText = type === 'in'
-        ? `Ajout confirmé : +1. Nouveau stock : ${newQuantity}.`
-        : `Retrait confirmé : −1. Nouveau stock : ${newQuantity}.`;
+      const resultText = movementType === 'ENTREE'
+        ? `Ajout validé : +${movementQty}. Nouveau stock : ${newQuantity}.`
+        : `Retrait validé : −${movementQty}. Nouveau stock : ${newQuantity}.`;
+
+      const status = getStatus(selectedItem);
 
       const alertText = alertSent
-        ? ' Alerte email automatique envoyée.'
+        ? ` Alerte email envoyée (${status.label}).`
         : '';
 
+      resetPending();
       showNotification(resultText + alertText, 'success');
 
       qrSearch.focus();
@@ -566,6 +596,10 @@ function initStockPage() {
     } catch (error) {
       console.error(error);
       showNotification(`Erreur Appwrite : ${error.message}`, 'error');
+
+    } finally {
+      validateStockBtn.disabled = false;
+      validateStockBtn.textContent = 'Valider le mouvement';
     }
   }
 
@@ -640,8 +674,9 @@ function initStockPage() {
       );
 
       scannerRunning = true;
-      startScannerBtn.style.display = 'none';
-      stopScannerBtn.style.display = 'flex';
+
+      if (startScannerBtn) startScannerBtn.style.display = 'none';
+      if (stopScannerBtn) stopScannerBtn.style.display = 'block';
 
     } catch (error) {
       console.error(error);
@@ -653,8 +688,10 @@ function initStockPage() {
   async function stopScanner(showMessage = true) {
     if (!qrScanner || !scannerRunning) {
       qrReader?.classList.remove('active');
-      startScannerBtn.style.display = 'flex';
-      stopScannerBtn.style.display = 'none';
+
+      if (startScannerBtn) startScannerBtn.style.display = 'block';
+      if (stopScannerBtn) stopScannerBtn.style.display = 'none';
+
       return;
     }
 
@@ -667,8 +704,9 @@ function initStockPage() {
       lastScannedValue = '';
 
       qrReader.classList.remove('active');
-      startScannerBtn.style.display = 'flex';
-      stopScannerBtn.style.display = 'none';
+
+      if (startScannerBtn) startScannerBtn.style.display = 'block';
+      if (stopScannerBtn) stopScannerBtn.style.display = 'none';
 
       if (showMessage) {
         showNotification('Caméra fermée.', 'success');
@@ -691,18 +729,18 @@ function initStockPage() {
     handleCode(qrSearch.value, false);
   });
 
-  startScannerBtn.addEventListener('click', startScanner);
-  stopScannerBtn.addEventListener('click', () => stopScanner(true));
+  startScannerBtn?.addEventListener('click', startScanner);
+  stopScannerBtn?.addEventListener('click', () => stopScanner(true));
 
-  addStockBtn.addEventListener('click', () => {
-    applyStockMovement('in');
-  });
+  addStockBtn.addEventListener('click', addPendingStock);
+  removeStockBtn.addEventListener('click', removePendingStock);
+  validateStockBtn.addEventListener('click', validateStockMovement);
 
-  removeStockBtn.addEventListener('click', () => {
-    applyStockMovement('out');
-  });
+  if (stopScannerBtn) {
+    stopScannerBtn.style.display = 'none';
+  }
 
-  stopScannerBtn.style.display = 'none';
+  updatePendingDisplay();
 
   loadItems().then(() => {
     qrSearch.focus();
