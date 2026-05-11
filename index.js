@@ -19,15 +19,15 @@ const DEFAULT_CATEGORY = 'Consommable';
 const DEFAULT_EQUIPMENT_FAMILY = 'Moniteur multiparamétrique';
 const DEFAULT_CONSUMABLE_TYPE = 'Capteur SpO2';
 
+const ALERT_FUNCTION_ID = 'send_stock_alert';
+const ALERT_EMAIL = 'alpha.balde@ramsaysante.fr';
+
 const client = new Client()
   .setEndpoint(APPWRITE_ENDPOINT)
   .setProject(APPWRITE_PROJECT_ID);
 
 const databases = new Databases(client);
 const functions = new Functions(client);
-
-const ALERT_FUNCTION_ID = 'send_stock_alert';
-const ALERT_EMAIL = 'alpha.balde@ramsaysante.fr';
 
 // ==============================
 // OUTILS
@@ -285,7 +285,7 @@ async function findOrCreateSupplier({ supplier, contact, email, notes }) {
 }
 
 // ==============================
-// ALERTE AUTOMATIQUE
+// ALERTE AUTOMATIQUE EMAIL
 // ==============================
 
 async function sendAutomaticStockAlert(item, movementType, oldQuantity, newQuantity) {
@@ -294,7 +294,16 @@ async function sendAutomaticStockAlert(item, movementType, oldQuantity, newQuant
     stockQuantity: newQuantity
   });
 
+  console.log('Vérification alerte stock', {
+    itemCode: item.itemCode,
+    oldQuantity,
+    newQuantity,
+    alertThreshold: item.alertThreshold,
+    status: status.label
+  });
+
   if (status.label !== 'Stock bas' && status.label !== 'Rupture') {
+    console.log('Pas d’alerte : stock OK.');
     return false;
   }
 
@@ -322,10 +331,10 @@ async function sendAutomaticStockAlert(item, movementType, oldQuantity, newQuant
   };
 
   try {
-    await functions.createExecution(
+    const execution = await functions.createExecution(
       ALERT_FUNCTION_ID,
       JSON.stringify(payload),
-      true,
+      false,
       '/',
       'POST',
       {
@@ -333,11 +342,16 @@ async function sendAutomaticStockAlert(item, movementType, oldQuantity, newQuant
       }
     );
 
-    console.log('Alerte stock envoyée automatiquement.');
+    console.log('Exécution alerte Appwrite créée :', execution);
     return true;
 
   } catch (error) {
-    console.error('Erreur alerte automatique :', error);
+    console.error('Erreur création exécution alerte Appwrite :', error);
+
+    alert(
+      `Erreur alerte email : ${error.message || 'Impossible de lancer la Function Appwrite.'}`
+    );
+
     return false;
   }
 }
@@ -399,6 +413,20 @@ function initStockPage() {
   function resetPending() {
     pendingDelta = 0;
     updatePendingDisplay();
+  }
+
+  function showPendingMessage() {
+    if (pendingDelta > 0) {
+      showNotification(`Préparation : ajout de ${pendingDelta} article(s).`, 'success');
+      return;
+    }
+
+    if (pendingDelta < 0) {
+      showNotification(`Préparation : retrait de ${Math.abs(pendingDelta)} article(s).`, 'warning');
+      return;
+    }
+
+    showNotification('Mouvement annulé. Quantité à valider : 0.', 'warning');
   }
 
   function clearSelectedItem() {
@@ -481,8 +509,7 @@ function initStockPage() {
 
     pendingDelta += 1;
     updatePendingDisplay();
-
-    showNotification(`Préparation : ajout de ${pendingDelta > 0 ? pendingDelta : 0} article(s).`, 'success');
+    showPendingMessage();
   }
 
   function removePendingStock() {
@@ -502,8 +529,7 @@ function initStockPage() {
 
     pendingDelta -= 1;
     updatePendingDisplay();
-
-    showNotification(`Préparation : retrait de ${Math.abs(pendingDelta)} article(s).`, 'warning');
+    showPendingMessage();
   }
 
   async function validateStockMovement() {
