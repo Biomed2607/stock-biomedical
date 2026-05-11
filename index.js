@@ -633,23 +633,23 @@ function initStockPage() {
 function initGestionPage() {
   const form = document.querySelector('#itemForm');
   const table = document.querySelector('#itemsTable');
+  const stockGestionTable = document.querySelector('#stockGestionTable');
   const message = document.querySelector('#formMessage');
   const resetBtn = document.querySelector('#resetBtn');
   const searchInput = document.querySelector('#searchInput');
-  const showListRadio = document.querySelector('#showListRadio');
-  const itemsListContainer = document.querySelector('#itemsListContainer');
-  const familyFilter = document.querySelector('#familyFilter');
-  const typeFilter = document.querySelector('#typeFilter');
 
-  if (!form || !table) return;
+  const showItemsBtn = document.querySelector('#showItemsBtn');
+  const showStockBtn = document.querySelector('#showStockBtn');
+  const itemsListContainer = document.querySelector('#itemsListContainer');
+  const stockListContainer = document.querySelector('#stockListContainer');
+
+  if (!form) return;
 
   let itemsCache = [];
 
   function clearForm() {
     form.reset();
     document.querySelector('#itemId').value = '';
-    document.querySelector('#itemInternalCode').value = '';
-    document.querySelector('#itemQrValue').value = '';
     document.querySelector('#formTitle').textContent = 'Ajouter un consommable';
     message.textContent = '';
     message.className = 'message';
@@ -658,36 +658,25 @@ function initGestionPage() {
   function fillForm(item) {
     document.querySelector('#formTitle').textContent = 'Modifier un consommable';
     document.querySelector('#itemId').value = item.$id;
-    document.querySelector('#itemInternalCode').value = item.internalCode || '';
-    document.querySelector('#itemQrValue').value = item.barcodeValue || '';
-
     document.querySelector('#reference').value = item.itemCode || '';
     document.querySelector('#designation').value = item.itemName || '';
 
-    document.querySelector('#equipmentFamily').value = item.equipmentFamily || DEFAULT_EQUIPMENT_FAMILY;
-    document.querySelector('#consumableType').value = item.consumableType || DEFAULT_CONSUMABLE_TYPE;
-
     const categoryInput = document.querySelector('#category');
-
     if (categoryInput) {
       categoryInput.value = item.category || DEFAULT_CATEGORY;
     }
 
+    const thresholdInput = document.querySelector('#threshold');
+    if (thresholdInput) {
+      thresholdInput.value = safeNumber(item.alertThreshold);
+    }
+
     document.querySelector('#price').value = item.unitPrice || 0;
-    document.querySelector('#alertThreshold').value = safeNumber(item.alertThreshold);
-    document.querySelector('#storageLocation').value = item.storageLocation || '';
     document.querySelector('#supplier').value = item.supplierName || '';
     document.querySelector('#contact').value = '';
     document.querySelector('#email').value = getSupplierEmail(item);
+    document.querySelector('#location').value = item.storageLocation || '';
     document.querySelector('#notes').value = '';
-
-    if (itemsListContainer) {
-      itemsListContainer.classList.add('hidden');
-    }
-
-    if (showListRadio) {
-      showListRadio.checked = false;
-    }
 
     window.scrollTo({
       top: 0,
@@ -695,75 +684,102 @@ function initGestionPage() {
     });
   }
 
-  async function renderGestion() {
-    try {
-      itemsCache = await listItems();
+  function showItemsView() {
+    itemsListContainer?.classList.remove('hidden');
+    stockListContainer?.classList.add('hidden');
 
-      const term = String(searchInput?.value || '').toLowerCase();
-      const familyValue = String(familyFilter?.value || '').toLowerCase();
-      const typeValue = String(typeFilter?.value || '').toLowerCase();
+    showItemsBtn?.classList.add('primary');
+    showItemsBtn?.classList.remove('secondary');
 
-      const filtered = itemsCache.filter(item => {
-        const matchesSearch =
-          String(item.itemCode || '').toLowerCase().includes(term) ||
-          String(item.itemName || '').toLowerCase().includes(term) ||
-          String(item.equipmentFamily || '').toLowerCase().includes(term) ||
-          String(item.consumableType || '').toLowerCase().includes(term) ||
-          String(item.category || '').toLowerCase().includes(term) ||
-          String(item.barcodeValue || '').toLowerCase().includes(term) ||
-          String(item.storageLocation || '').toLowerCase().includes(term) ||
-          String(item.supplierName || '').toLowerCase().includes(term) ||
-          String(getSupplierEmail(item) || '').toLowerCase().includes(term);
+    showStockBtn?.classList.add('secondary');
+    showStockBtn?.classList.remove('primary');
 
-        const matchesFamily =
-          !familyValue ||
-          String(item.equipmentFamily || '').toLowerCase() === familyValue;
+    renderGestion();
+  }
 
-        const matchesType =
-          !typeValue ||
-          String(item.consumableType || '').toLowerCase() === typeValue;
+  function showStockView() {
+    stockListContainer?.classList.remove('hidden');
+    itemsListContainer?.classList.add('hidden');
 
-        return matchesSearch && matchesFamily && matchesType;
-      });
+    showStockBtn?.classList.add('primary');
+    showStockBtn?.classList.remove('secondary');
 
-      if (!filtered.length) {
-        table.innerHTML = '<tr><td colspan="12">Aucun consommable trouvé.</td></tr>';
-        return;
-      }
+    showItemsBtn?.classList.add('secondary');
+    showItemsBtn?.classList.remove('primary');
 
-      table.innerHTML = filtered.map(item => `
+    renderGestionStock();
+  }
+
+  async function loadItems() {
+    itemsCache = await listItems();
+  }
+
+  function renderGestion() {
+    if (!table) return;
+
+    const term = String(searchInput?.value || '').toLowerCase();
+
+    const filtered = itemsCache.filter(item =>
+      String(item.itemCode || '').toLowerCase().includes(term) ||
+      String(item.itemName || '').toLowerCase().includes(term) ||
+      String(item.category || '').toLowerCase().includes(term) ||
+      String(item.supplierName || '').toLowerCase().includes(term) ||
+      String(item.storageLocation || '').toLowerCase().includes(term)
+    );
+
+    if (!filtered.length) {
+      table.innerHTML = '<tr><td colspan="9">Aucun consommable trouvé.</td></tr>';
+      return;
+    }
+
+    table.innerHTML = filtered.map(item => `
+      <tr>
+        <td>${escapeHtml(item.itemCode || '')}</td>
+        <td>${escapeHtml(item.itemName || '')}</td>
+        <td>${escapeHtml(item.category || '')}</td>
+        <td>${escapeHtml(item.supplierName || '')}</td>
+        <td>${escapeHtml(getSupplierEmail(item))}</td>
+        <td>${euro(item.unitPrice)}</td>
+        <td>${escapeHtml(item.storageLocation || '-')}</td>
+        <td>${item.barcodeValue ? `<small>${escapeHtml(item.barcodeValue)}</small>` : '-'}</td>
+        <td class="row-actions">
+          <button class="btn secondary" type="button" data-edit="${item.$id}">Modifier</button>
+          <button class="btn danger" type="button" data-delete="${item.$id}">Supprimer</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function renderGestionStock() {
+    if (!stockGestionTable) return;
+
+    const sortedItems = [...itemsCache].sort((a, b) => {
+      const aQty = safeNumber(a.stockQuantity);
+      const bQty = safeNumber(b.stockQuantity);
+      return aQty - bQty;
+    });
+
+    if (!sortedItems.length) {
+      stockGestionTable.innerHTML = '<tr><td colspan="8">Aucun stock disponible.</td></tr>';
+      return;
+    }
+
+    stockGestionTable.innerHTML = sortedItems.map(item => {
+      const status = getStatus(item);
+
+      return `
         <tr>
+          <td><strong>${safeNumber(item.stockQuantity)}</strong></td>
           <td>${escapeHtml(item.itemCode || '')}</td>
           <td>${escapeHtml(item.itemName || '')}</td>
-          <td>${escapeHtml(item.equipmentFamily || '')}</td>
-          <td>${escapeHtml(item.consumableType || '')}</td>
-          <td>${escapeHtml(item.category || '')}</td>
-          <td>${escapeHtml(item.storageLocation || '')}</td>
           <td>${safeNumber(item.alertThreshold)}</td>
           <td>${escapeHtml(item.supplierName || '')}</td>
           <td>${escapeHtml(getSupplierEmail(item))}</td>
-          <td>${euro(item.unitPrice)}</td>
-          <td>
-            ${
-              item.barcodeValue
-                ? `<div class="qr-cell" data-qr-value="${escapeHtml(item.barcodeValue)}"></div>`
-                : '<span>À générer</span>'
-            }
-          </td>
-          <td class="row-actions">
-            <button class="btn secondary" type="button" data-edit="${item.$id}">Modifier</button>
-            <button class="btn warning" type="button" data-print="${item.$id}">Imprimer QR</button>
-            <button class="btn danger" type="button" data-delete="${item.$id}">Supprimer</button>
-          </td>
+          <td>${escapeHtml(item.storageLocation || '-')}</td>
+          <td><span class="status ${status.className}">${status.label}</span></td>
         </tr>
-      `).join('');
-
-      renderAllQrCodes();
-
-    } catch (error) {
-      table.innerHTML = `<tr><td colspan="12">Erreur Appwrite : ${escapeHtml(error.message)}</td></tr>`;
-      console.error(error);
-    }
+      `;
+    }).join('');
   }
 
   form.addEventListener('submit', async event => {
@@ -776,33 +792,20 @@ function initGestionPage() {
 
     const itemCode = document.querySelector('#reference').value.trim();
     const itemName = document.querySelector('#designation').value.trim();
-    const equipmentFamily = document.querySelector('#equipmentFamily').value.trim();
-    const consumableType = document.querySelector('#consumableType').value.trim();
     const category = document.querySelector('#category')?.value || DEFAULT_CATEGORY;
     const unitPrice = safeNumber(document.querySelector('#price').value);
-    const alertThreshold = safeNumber(document.querySelector('#alertThreshold').value);
-    const storageLocation = document.querySelector('#storageLocation').value.trim();
+    const alertThreshold = safeNumber(document.querySelector('#threshold')?.value || 0);
 
     const supplierName = document.querySelector('#supplier').value.trim();
     const contact = document.querySelector('#contact').value.trim();
     const email = document.querySelector('#email').value.trim();
+    const storageLocation = document.querySelector('#location')?.value.trim() || '';
     const notes = document.querySelector('#notes').value.trim();
 
-    let internalCode = document.querySelector('#itemInternalCode').value.trim();
-    let qrValue = document.querySelector('#itemQrValue').value.trim();
-
-    if (!itemCode || !itemName || !equipmentFamily || !consumableType || !category || !supplierName || !email || !storageLocation) {
-      message.textContent = 'Veuillez remplir référence, désignation, famille, type, catégorie, fournisseur, email et emplacement.';
+    if (!itemCode || !itemName || !supplierName || !email) {
+      message.textContent = 'Veuillez remplir référence, désignation, fournisseur et email fournisseur.';
       message.classList.add('error');
       return;
-    }
-
-    if (!internalCode) {
-      internalCode = generateInternalCode(itemCode, equipmentFamily, consumableType);
-    }
-
-    if (!qrValue) {
-      qrValue = generateQrValue(internalCode);
     }
 
     try {
@@ -815,25 +818,26 @@ function initGestionPage() {
 
       const isNewItem = !documentId;
 
+      const generatedInternalCode = `INT-${itemCode}-${Date.now()}`;
+      const generatedBarcodeValue = `BIO-${itemCode}-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
+
       const data = {
         itemName,
         itemCode,
-        equipmentFamily,
-        consumableType,
         category,
         unitPrice,
-        alertThreshold,
         expirationDate: null,
         supplierId: supplierDoc.$id,
         supplierName,
         Email: email,
-        internalCode,
-        barcodeValue: qrValue,
-        storageLocation
+        storageLocation,
+        alertThreshold
       };
 
       if (isNewItem) {
         data.stockQuantity = 0;
+        data.internalCode = generatedInternalCode;
+        data.barcodeValue = generatedBarcodeValue;
       }
 
       if (documentId) {
@@ -852,11 +856,19 @@ function initGestionPage() {
         );
       }
 
-      message.textContent = 'Consommable enregistré avec succès. QR code généré automatiquement.';
+      message.textContent = 'Consommable enregistré avec succès.';
       message.classList.add('success');
 
       clearForm();
-      await renderGestion();
+      await loadItems();
+
+      if (!itemsListContainer?.classList.contains('hidden')) {
+        renderGestion();
+      }
+
+      if (!stockListContainer?.classList.contains('hidden')) {
+        renderGestionStock();
+      }
 
     } catch (error) {
       console.error(error);
@@ -865,19 +877,13 @@ function initGestionPage() {
     }
   });
 
-  table.addEventListener('click', async event => {
+  table?.addEventListener('click', async event => {
     const editId = event.target.dataset.edit;
-    const printId = event.target.dataset.print;
     const deleteId = event.target.dataset.delete;
 
     if (editId) {
       const item = itemsCache.find(doc => doc.$id === editId);
       if (item) fillForm(item);
-    }
-
-    if (printId) {
-      const item = itemsCache.find(doc => doc.$id === printId);
-      if (item) printQrCode(item);
     }
 
     if (deleteId) {
@@ -892,7 +898,9 @@ function initGestionPage() {
           deleteId
         );
 
-        await renderGestion();
+        await loadItems();
+        renderGestion();
+        renderGestionStock();
 
       } catch (error) {
         alert(`Erreur Appwrite : ${error.message}`);
@@ -900,22 +908,27 @@ function initGestionPage() {
     }
   });
 
-  showListRadio?.addEventListener('change', () => {
-    if (!itemsListContainer) return;
-
-    if (showListRadio.checked) {
-      itemsListContainer.classList.remove('hidden');
-    } else {
-      itemsListContainer.classList.add('hidden');
-    }
-  });
-
   resetBtn?.addEventListener('click', clearForm);
   searchInput?.addEventListener('input', renderGestion);
-  familyFilter?.addEventListener('change', renderGestion);
-  typeFilter?.addEventListener('change', renderGestion);
 
-  renderGestion();
+  showItemsBtn?.addEventListener('click', showItemsView);
+  showStockBtn?.addEventListener('click', showStockView);
+
+  loadItems()
+    .then(() => {
+      showItemsView();
+    })
+    .catch(error => {
+      console.error(error);
+
+      if (table) {
+        table.innerHTML = `<tr><td colspan="9">Erreur Appwrite : ${escapeHtml(error.message)}</td></tr>`;
+      }
+
+      if (stockGestionTable) {
+        stockGestionTable.innerHTML = `<tr><td colspan="8">Erreur Appwrite : ${escapeHtml(error.message)}</td></tr>`;
+      }
+    });
 }
 
 // ==============================
