@@ -26,7 +26,7 @@ const client = new Client()
 const databases = new Databases(client);
 const functions = new Functions(client);
 
-// ID exact de la Function Appwrite à créer
+// Function Appwrite qui envoie les emails via Resend
 const ALERT_FUNCTION_ID = 'send_stock_alert';
 
 // Destinataire automatique des alertes stock
@@ -330,6 +330,7 @@ async function sendAutomaticStockAlert(item, movementType, oldQuantity, newQuant
     stockQuantity: newQuantity
   });
 
+  // Envoi uniquement si stock bas ou rupture
   if (status.label !== 'Stock bas' && status.label !== 'Rupture') {
     return false;
   }
@@ -358,13 +359,18 @@ async function sendAutomaticStockAlert(item, movementType, oldQuantity, newQuant
   };
 
   try {
-    await functions.createExecution({
-      functionId: ALERT_FUNCTION_ID,
-      body: JSON.stringify(payload),
-      async: true
-    });
+    await functions.createExecution(
+      ALERT_FUNCTION_ID,
+      JSON.stringify(payload),
+      true,
+      '/',
+      'POST',
+      {
+        'content-type': 'application/json'
+      }
+    );
 
-    console.log('Alerte stock envoyée via Appwrite Function.');
+    console.log('Alerte stock envoyée automatiquement via Appwrite Function.');
     return true;
 
   } catch (error) {
