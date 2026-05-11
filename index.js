@@ -323,7 +323,9 @@ function initStockPage() {
   const addStockBtn = document.querySelector('#addStockBtn');
   const removeStockBtn = document.querySelector('#removeStockBtn');
 
-  if (!qrSearch || !currentCode || !notification || !addStockBtn || !removeStockBtn) return;
+  if (!qrSearch || !currentCode || !notification || !addStockBtn || !removeStockBtn) {
+    return;
+  }
 
   let itemsCache = [];
   let selectedItem = null;
@@ -370,7 +372,7 @@ function initStockPage() {
     currentCode.classList.remove('empty');
     currentCode.innerHTML = `
       ${escapeHtml(item.itemCode || '')}<br>
-      <span style="font-family: inherit; font-size: 0.9rem;">
+      <span class="current-item-detail">
         ${escapeHtml(item.itemName || '')}<br>
         Stock : ${safeNumber(item.stockQuantity)} | Seuil : ${safeNumber(item.alertThreshold)} | ${escapeHtml(status.label)}
       </span>
@@ -477,18 +479,6 @@ function initStockPage() {
       showNotification(resultText, 'success');
 
       qrSearch.focus();
-
-      const status = getStatus(selectedItem);
-
-      if (status.label === 'Rupture' || status.label === 'Stock bas') {
-        const openEmail = confirm(
-          `Alerte ${status.label} pour ${selectedItem.itemName}. Voulez-vous ouvrir l’email fournisseur ?`
-        );
-
-        if (openEmail) {
-          window.location.href = mailtoFor(selectedItem);
-        }
-      }
 
     } catch (error) {
       console.error(error);
@@ -618,8 +608,8 @@ function initStockPage() {
     handleCode(qrSearch.value, false);
   });
 
-  startScannerBtn?.addEventListener('click', startScanner);
-  stopScannerBtn?.addEventListener('click', () => stopScanner(true));
+  startScannerBtn.addEventListener('click', startScanner);
+  stopScannerBtn.addEventListener('click', () => stopScanner(true));
 
   addStockBtn.addEventListener('click', () => {
     applyStockMovement('in');
@@ -628,6 +618,8 @@ function initStockPage() {
   removeStockBtn.addEventListener('click', () => {
     applyStockMovement('out');
   });
+
+  stopScannerBtn.style.display = 'none';
 
   loadItems().then(() => {
     qrSearch.focus();
