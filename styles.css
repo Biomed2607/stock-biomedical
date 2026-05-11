@@ -875,3 +875,28 @@ footer {
 #itemsListContainer:not(.hidden) {
   display: block !important;
 }
+
+.gestion-toggle-header {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.gestion-toggle-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.gestion-view {
+  margin-top: 24px;
+}
+
+.gestion-view h3 {
+  margin-bottom: 16px;
+}
+
+#showItemsBtn.primary,
+#showStockBtn.primary {
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+}
