@@ -287,23 +287,13 @@ async function findOrCreateSupplier({ supplier, contact, email, notes }) {
 // ==============================
 // ALERTE AUTOMATIQUE EMAIL
 // ==============================
-
 async function sendAutomaticStockAlert(item, movementType, oldQuantity, newQuantity) {
   const status = getStatus({
     ...item,
     stockQuantity: newQuantity
   });
 
-  console.log('Vérification alerte stock', {
-    itemCode: item.itemCode,
-    oldQuantity,
-    newQuantity,
-    alertThreshold: item.alertThreshold,
-    status: status.label
-  });
-
   if (status.label !== 'Stock bas' && status.label !== 'Rupture') {
-    console.log('Pas d’alerte : stock OK.');
     return false;
   }
 
@@ -342,16 +332,36 @@ async function sendAutomaticStockAlert(item, movementType, oldQuantity, newQuant
       }
     );
 
-    console.log('Exécution alerte Appwrite créée :', execution);
+    console.log('Exécution alerte Appwrite :', execution);
+
+    if (execution.status !== 'completed') {
+      alert(`Alerte non envoyée : exécution Appwrite ${execution.status || 'inconnue'}.`);
+      return false;
+    }
+
+    const responseBody = execution.responseBody || execution.response || '';
+
+    if (responseBody) {
+      try {
+        const parsed = JSON.parse(responseBody);
+
+        if (parsed.ok === true) {
+          return true;
+        }
+
+        alert(`Alerte non envoyée : ${parsed.message || 'erreur inconnue Function.'}`);
+        return false;
+
+      } catch {
+        console.log('Réponse Function non JSON :', responseBody);
+      }
+    }
+
     return true;
 
   } catch (error) {
     console.error('Erreur création exécution alerte Appwrite :', error);
-
-    alert(
-      `Erreur alerte email : ${error.message || 'Impossible de lancer la Function Appwrite.'}`
-    );
-
+    alert(`Erreur alerte email : ${error.message || 'Impossible de lancer la Function Appwrite.'}`);
     return false;
   }
 }
