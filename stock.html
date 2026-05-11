@@ -10,8 +10,13 @@
   <script src="https://unpkg.com/html5-qrcode"></script>
 </head>
 
-<body class="stock-app-body">
-  <header class="site-header stock-page-nav">
+<body class="stock-only-body">
+  <header class="site-header stock-centered-header">
+    <div>
+      <h1>Stock</h1>
+      <p>Scannez un QR code puis ajoutez ou retirez du stock</p>
+    </div>
+
     <nav>
       <a href="index.html">Accueil</a>
       <a href="stock.html">Stock</a>
@@ -19,58 +24,63 @@
     </nav>
   </header>
 
-  <div class="stock-container">
-    <div class="stock-header">
-      <h1>Gestion de Stock</h1>
-      <p class="stock-subtitle">Scannez ou saisissez un code</p>
-    </div>
-
-    <div class="scanner-section">
-      <div class="scanner-wrapper">
-        <input
-          type="text"
-          class="scan-input"
-          id="qrSearch"
-          placeholder="Scanner ou saisir un code..."
-          autocomplete="off"
-          autofocus
-        />
-        <span class="scan-icon">📷</span>
+  <main class="stock-page">
+    <section class="stock-terminal">
+      <div class="stock-terminal-header">
+        <h2>Gestion de Stock</h2>
+        <p>Scannez ou saisissez un code</p>
       </div>
 
-      <div class="camera-toggle">
-        <button class="btn-camera" id="startScannerBtn" type="button">
-          <span>📸</span> Ouvrir caméra
+      <div class="stock-terminal-body">
+        <div class="scan-input-wrapper">
+          <input
+            id="qrSearch"
+            class="scan-input-main"
+            type="text"
+            placeholder="Scanner ou saisir un code..."
+            autocomplete="off"
+            autofocus
+          />
+          <span class="scan-input-icon">📷</span>
+        </div>
+
+        <div class="camera-row">
+          <button id="startScannerBtn" class="camera-main-btn" type="button">
+            📸 Ouvrir caméra
+          </button>
+
+          <button id="stopScannerBtn" class="camera-main-btn danger" type="button">
+            ✕ Fermer caméra
+          </button>
+        </div>
+
+        <div id="qrReader" class="qr-reader-box"></div>
+
+        <div class="current-item-card">
+          <div class="current-label">Article scanné</div>
+          <div id="currentCode" class="current-code empty">Aucun article</div>
+        </div>
+
+        <div class="stock-counter">
+          <button id="removeStockBtn" class="stock-round-btn minus" type="button">−</button>
+
+          <div class="pending-box">
+            <span>Quantité</span>
+            <strong id="pendingQuantity">0</strong>
+          </div>
+
+          <button id="addStockBtn" class="stock-round-btn plus" type="button">+</button>
+        </div>
+
+        <button id="validateStockBtn" class="validate-stock-btn" type="button">
+          Valider le mouvement
         </button>
 
-        <button class="btn-camera stop" id="stopScannerBtn" type="button">
-          <span>✕</span> Fermer caméra
-        </button>
+        <div id="stockNotification" class="notification" style="display: none;"></div>
       </div>
+    </section>
+  </main>
 
-      <div class="qr-reader" id="qrReader"></div>
-    </div>
-
-    <div class="actions-section">
-      <div class="current-item">
-        <div class="label">Article scanné</div>
-        <div class="code empty" id="currentCode">Aucun article</div>
-      </div>
-
-      <div class="btn-group">
-        <button class="btn-action btn-remove" id="removeStockBtn" type="button">
-          <span>−</span>
-        </button>
-
-        <button class="btn-action btn-add" id="addStockBtn" type="button">
-          <span>+</span>
-        </button>
-      </div>
-
-      <div class="notification" id="stockNotification"></div>
-    </div>
-  </div>
-
-  <script type="module" src="index.js"></script>
+  <script type="module" src="index.js?v=30"></script>
 </body>
 </html>
