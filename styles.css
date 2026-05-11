@@ -810,3 +810,68 @@ footer {
     font-size: 3.4rem;
   }
 }
+
+.hidden {
+  display: none !important;
+}
+
+/* Stock : correction boutons caméra */
+#startScannerBtn,
+#stopScannerBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Stock : centrage propre des boutons + et - */
+.btn-group {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 34px !important;
+  margin-bottom: 22px;
+}
+
+.btn-action {
+  width: 104px !important;
+  height: 104px !important;
+  border-radius: 50% !important;
+  border: none !important;
+  color: #ffffff !important;
+  font-size: 4rem !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  cursor: pointer !important;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.22) !important;
+}
+
+.btn-add {
+  background: linear-gradient(135deg, #16a34a, #34d399) !important;
+}
+
+.btn-remove {
+  background: linear-gradient(135deg, #dc2626, #fb7185) !important;
+}
+
+.btn-action span {
+  display: block;
+  transform: translateY(-3px);
+}
+
+.current-item-detail {
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+/* Gestion stock : affichage de la liste */
+#itemsListContainer.hidden {
+  display: none !important;
+}
+
+#itemsListContainer:not(.hidden) {
+  display: block !important;
+}
