@@ -1,4 +1,4 @@
-iexport default async ({ req, res, log, error }) => {
+export default async ({ req, res, log, error }) => {
   try {
     log('Function send_stock_alert démarrée avec Resend API');
 
@@ -111,5 +111,4 @@ iexport default async ({ req, res, log, error }) => {
       message: err.message
     }, 500);
   }
-};
 };
