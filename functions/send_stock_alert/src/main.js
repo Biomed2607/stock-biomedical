@@ -13,7 +13,17 @@ export default async ({ req, res, log, error }) => {
       }, 500);
     }
 
-    const payload = JSON.parse(req.body || '{}');
+    let payload = {};
+
+    if (typeof req.body === 'string') {
+      payload = JSON.parse(req.body || '{}');
+    } else if (typeof req.body === 'object' && req.body !== null) {
+      payload = req.body;
+    } else {
+      payload = {};
+    }
+
+    log(`Payload reçu : ${JSON.stringify(payload)}`);
 
     const to = payload.to || defaultToEmail;
     const status = payload.status || 'Alerte stock';
@@ -23,7 +33,8 @@ export default async ({ req, res, log, error }) => {
     if (!item.itemCode || !item.itemName) {
       return res.json({
         ok: false,
-        message: 'Payload incomplet : itemCode et itemName sont obligatoires.'
+        message: 'Payload incomplet : itemCode et itemName sont obligatoires.',
+        received: payload
       }, 400);
     }
 
