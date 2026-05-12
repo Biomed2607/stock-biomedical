@@ -775,10 +775,19 @@ function initGestionPage() {
 
   const message = document.querySelector('#formMessage');
   const resetBtn = document.querySelector('#resetBtn');
+
   const searchInput = document.querySelector('#searchInput');
   const supplierSearchInput = document.querySelector('#supplierSearchInput');
   const familyFilter = document.querySelector('#familyFilter');
   const typeFilter = document.querySelector('#typeFilter');
+
+  const supplierOptions = document.querySelector('#supplierOptions');
+  const familyOptions = document.querySelector('#familyOptions');
+  const typeOptions = document.querySelector('#typeOptions');
+
+  const formSupplierOptions = document.querySelector('#formSupplierOptions');
+  const formFamilyOptions = document.querySelector('#formFamilyOptions');
+  const formTypeOptions = document.querySelector('#formTypeOptions');
 
   const showItemsBtn = document.querySelector('#showItemsBtn');
   const showStockBtn = document.querySelector('#showStockBtn');
@@ -791,6 +800,39 @@ function initGestionPage() {
 
   let itemsCache = [];
   let activeView = '';
+
+  function fillDatalist(element, values) {
+    if (!element) return;
+
+    const uniqueValues = [...new Set(
+      values
+        .map(value => String(value || '').trim())
+        .filter(Boolean)
+    )].sort((a, b) => a.localeCompare(b, 'fr'));
+
+    element.innerHTML = uniqueValues
+      .map(value => `<option value="${escapeHtml(value)}"></option>`)
+      .join('');
+  }
+
+  function updateFilterOptions() {
+    const suppliers = itemsCache.flatMap(item => [
+      item.supplierName,
+      getSupplierEmail(item)
+    ]);
+
+    const families = itemsCache.map(item => item.equipmentFamily);
+    const types = itemsCache.map(item => item.consumableType);
+
+    fillDatalist(supplierOptions, suppliers);
+    fillDatalist(formSupplierOptions, suppliers);
+
+    fillDatalist(familyOptions, families);
+    fillDatalist(formFamilyOptions, families);
+
+    fillDatalist(typeOptions, types);
+    fillDatalist(formTypeOptions, types);
+  }
 
   function clearForm() {
     form.reset();
@@ -832,6 +874,7 @@ function initGestionPage() {
 
   async function loadItems() {
     itemsCache = await listItems();
+    updateFilterOptions();
   }
 
   function getFilteredItems() {
@@ -980,6 +1023,8 @@ function initGestionPage() {
   }
 
   function refreshActiveView() {
+    updateFilterOptions();
+
     if (activeView === 'items') {
       renderItemsTable();
     }
@@ -1159,6 +1204,10 @@ function initGestionPage() {
   showItemsBtn?.addEventListener('click', showItemsView);
   showStockBtn?.addEventListener('click', showStockView);
   sendStockAlertBtn?.addEventListener('click', sendManualStockAlerts);
+
+  loadItems().catch(error => {
+    console.error(error);
+  });
 }
 
 // ==============================
