@@ -793,6 +793,21 @@ function initGestionPage() {
   const showStockBtn = document.querySelector('#showStockBtn');
   const sendStockAlertBtn = document.querySelector('#sendStockAlertBtn');
 
+  const openVisualSearchBtn = document.querySelector('#openVisualSearchBtn');
+  const locationModal = document.querySelector('#locationModal');
+  const closeLocationModal = document.querySelector('#closeLocationModal');
+  const visualSearchInput = document.querySelector('#visualSearchInput');
+  const visualSearchBtn = document.querySelector('#visualSearchBtn');
+  const visualSearchOptions = document.querySelector('#visualSearchOptions');
+
+  const locationSubtitle = document.querySelector('#locationSubtitle');
+  const locationRef = document.querySelector('#locationRef');
+  const locationName = document.querySelector('#locationName');
+  const locationPlace = document.querySelector('#locationPlace');
+  const locationSupplier = document.querySelector('#locationSupplier');
+  const rackTitle = document.querySelector('#rackTitle');
+  const rackHint = document.querySelector('#rackHint');
+
   const itemsListContainer = document.querySelector('#itemsListContainer');
   const stockListContainer = document.querySelector('#stockListContainer');
 
@@ -824,6 +839,12 @@ function initGestionPage() {
     const families = itemsCache.map(item => item.equipmentFamily);
     const types = itemsCache.map(item => item.consumableType);
 
+    const visualValues = itemsCache.flatMap(item => [
+      item.itemCode,
+      item.itemName,
+      `${item.itemCode || ''} - ${item.itemName || ''}`
+    ]);
+
     fillDatalist(supplierOptions, suppliers);
     fillDatalist(formSupplierOptions, suppliers);
 
@@ -832,6 +853,138 @@ function initGestionPage() {
 
     fillDatalist(typeOptions, types);
     fillDatalist(formTypeOptions, types);
+
+    fillDatalist(visualSearchOptions, visualValues);
+  }
+
+  function parseStorageLocation(location) {
+    const raw = String(location || '').trim();
+    const text = raw
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+
+    const rayonMatch =
+      text.match(/rayon\s*([0-9]+)/i) ||
+      text.match(/\br\s*([0-9]+)/i);
+
+    const shelfMatch =
+      text.match(/etagere\s*([0-9]+)/i) ||
+      text.match(/etage\s*([0-9]+)/i) ||
+      text.match(/\be\s*([0-9]+)/i);
+
+    return {
+      raw,
+      rayon: rayonMatch ? rayonMatch[1] : '?',
+      shelf: shelfMatch ? shelfMatch[1] : null
+    };
+  }
+
+  function clearLocationView() {
+    document.querySelectorAll('.rack-shelf').forEach(shelf => {
+      shelf.classList.remove('active');
+    });
+
+    if (locationSubtitle) {
+      locationSubtitle.textContent = 'Sélectionnez une référence ou utilisez le bouton Localiser.';
+    }
+
+    if (locationRef) locationRef.textContent = '-';
+    if (locationName) locationName.textContent = '-';
+    if (locationPlace) locationPlace.textContent = '-';
+    if (locationSupplier) locationSupplier.textContent = '-';
+    if (rackTitle) rackTitle.textContent = 'Rayon';
+    if (rackHint) rackHint.textContent = 'Étagère à repérer';
+  }
+
+  function openLocationModal(item = null) {
+    if (!locationModal) return;
+
+    locationModal.classList.remove('hidden');
+    locationModal.setAttribute('aria-hidden', 'false');
+
+    if (!item) {
+      clearLocationView();
+      setTimeout(() => visualSearchInput?.focus(), 50);
+      return;
+    }
+
+    renderLocation(item);
+  }
+
+  function closeLocationView() {
+    if (!locationModal) return;
+
+    locationModal.classList.add('hidden');
+    locationModal.setAttribute('aria-hidden', 'true');
+  }
+
+  function findItemForVisualSearch(value) {
+    const search = String(value || '').trim().toLowerCase();
+
+    if (!search) return null;
+
+    return itemsCache.find(item =>
+      String(item.itemCode || '').toLowerCase() === search ||
+      String(item.itemName || '').toLowerCase() === search ||
+      `${String(item.itemCode || '').toLowerCase()} - ${String(item.itemName || '').toLowerCase()}` === search ||
+      String(item.itemCode || '').toLowerCase().includes(search) ||
+      String(item.itemName || '').toLowerCase().includes(search)
+    );
+  }
+
+  function renderLocation(item) {
+    if (!item) return;
+
+    const parsed = parseStorageLocation(item.storageLocation);
+
+    document.querySelectorAll('.rack-shelf').forEach(shelf => {
+      shelf.classList.remove('active');
+    });
+
+    if (locationSubtitle) {
+      locationSubtitle.textContent = `${item.itemCode || '-'} — ${item.itemName || '-'}`;
+    }
+
+    if (locationRef) locationRef.textContent = item.itemCode || '-';
+    if (locationName) locationName.textContent = item.itemName || '-';
+    if (locationPlace) locationPlace.textContent = item.storageLocation || '-';
+    if (locationSupplier) locationSupplier.textContent = item.supplierName || '-';
+
+    if (rackTitle) {
+      rackTitle.textContent = parsed.rayon !== '?'
+        ? `Rayon ${parsed.rayon}`
+        : 'Rayon non identifié';
+    }
+
+    if (rackHint) {
+      rackHint.textContent = parsed.shelf
+        ? `Étagère ${parsed.shelf}`
+        : 'Étagère non identifiée';
+    }
+
+    if (parsed.shelf) {
+      const activeShelf = document.querySelector(`.rack-shelf[data-shelf="${parsed.shelf}"]`);
+
+      if (activeShelf) {
+        activeShelf.classList.add('active');
+      }
+    }
+
+    if (visualSearchInput) {
+      visualSearchInput.value = item.itemCode || '';
+    }
+  }
+
+  function handleVisualSearch() {
+    const item = findItemForVisualSearch(visualSearchInput?.value);
+
+    if (!item) {
+      alert('Aucun consommable trouvé pour cette recherche visuelle.');
+      return;
+    }
+
+    renderLocation(item);
   }
 
   function clearForm() {
@@ -942,6 +1095,7 @@ function initGestionPage() {
           }
         </td>
         <td class="row-actions">
+          <button class="btn locate" type="button" data-locate="${item.$id}">Localiser</button>
           <button class="btn secondary" type="button" data-edit="${item.$id}">Modifier</button>
           <button class="btn warning" type="button" data-print="${item.$id}">Imprimer QR</button>
           <button class="btn danger" type="button" data-delete="${item.$id}">Supprimer</button>
@@ -966,7 +1120,7 @@ function initGestionPage() {
     });
 
     if (!sortedItems.length) {
-      stockGestionTable.innerHTML = '<tr><td colspan="10">Aucun stock trouvé.</td></tr>';
+      stockGestionTable.innerHTML = '<tr><td colspan="11">Aucun stock trouvé.</td></tr>';
       return;
     }
 
@@ -985,6 +1139,9 @@ function initGestionPage() {
           <td>${escapeHtml(item.storageLocation || '')}</td>
           <td>${escapeHtml(item.supplierName || '')}</td>
           <td>${escapeHtml(getSupplierEmail(item))}</td>
+          <td>
+            <button class="btn locate" type="button" data-locate="${item.$id}">Localiser</button>
+          </td>
         </tr>
       `;
     }).join('');
@@ -1159,9 +1316,15 @@ function initGestionPage() {
   });
 
   table?.addEventListener('click', async event => {
+    const locateId = event.target.dataset.locate;
     const editId = event.target.dataset.edit;
     const printId = event.target.dataset.print;
     const deleteId = event.target.dataset.delete;
+
+    if (locateId) {
+      const item = itemsCache.find(doc => doc.$id === locateId);
+      if (item) openLocationModal(item);
+    }
 
     if (editId) {
       const item = itemsCache.find(doc => doc.$id === editId);
@@ -1194,6 +1357,15 @@ function initGestionPage() {
     }
   });
 
+  stockGestionTable?.addEventListener('click', event => {
+    const locateId = event.target.dataset.locate;
+
+    if (locateId) {
+      const item = itemsCache.find(doc => doc.$id === locateId);
+      if (item) openLocationModal(item);
+    }
+  });
+
   resetBtn?.addEventListener('click', clearForm);
 
   searchInput?.addEventListener('input', refreshActiveView);
@@ -1204,6 +1376,33 @@ function initGestionPage() {
   showItemsBtn?.addEventListener('click', showItemsView);
   showStockBtn?.addEventListener('click', showStockView);
   sendStockAlertBtn?.addEventListener('click', sendManualStockAlerts);
+
+  openVisualSearchBtn?.addEventListener('click', () => {
+    openLocationModal();
+  });
+
+  closeLocationModal?.addEventListener('click', closeLocationView);
+
+  locationModal?.addEventListener('click', event => {
+    if (event.target === locationModal) {
+      closeLocationView();
+    }
+  });
+
+  visualSearchBtn?.addEventListener('click', handleVisualSearch);
+
+  visualSearchInput?.addEventListener('keydown', event => {
+    if (event.key !== 'Enter') return;
+
+    event.preventDefault();
+    handleVisualSearch();
+  });
+
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      closeLocationView();
+    }
+  });
 
   loadItems().catch(error => {
     console.error(error);
