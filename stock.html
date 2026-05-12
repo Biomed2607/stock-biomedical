@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>Stock — Stock Biomédical</title>
+  <title>Stock — Stock biomédical</title>
 
   <link rel="stylesheet" href="styles.css" />
   <script src="https://unpkg.com/html5-qrcode"></script>
@@ -12,9 +12,17 @@
 
 <body class="stock-only-body">
   <header class="site-header stock-centered-header">
-    <div>
-      <h1>Stock</h1>
-      <p>Scannez un QR code puis ajoutez ou retirez du stock</p>
+    <div class="brand">
+      <img
+        src="hopital_prive_drome_ardeche_logo.jpeg"
+        alt="Hôpital privé Drôme Ardèche"
+        class="brand-logo"
+      />
+
+      <div>
+        <h1>Stock</h1>
+        <p>Scannez un QR code puis ajoutez ou retirez du stock</p>
+      </div>
     </div>
 
     <nav>
@@ -27,8 +35,8 @@
   <main class="stock-page">
     <section class="stock-terminal">
       <div class="stock-terminal-header">
-        <h2>Gestion de Stock</h2>
-        <p>Scannez ou saisissez un code</p>
+        <h2>Gestion de stock</h2>
+        <p>Scannez ou saisissez une référence</p>
       </div>
 
       <div class="stock-terminal-body">
@@ -37,7 +45,7 @@
             id="qrSearch"
             class="scan-input-main"
             type="text"
-            placeholder="Scanner ou saisir un code..."
+            placeholder="Scanner ou saisir une référence..."
             autocomplete="off"
             autofocus
           />
@@ -62,18 +70,14 @@
         </div>
 
         <div class="stock-counter">
-          <button id="removeStockBtn" class="stock-round-btn minus" type="button">
-            −
-          </button>
+          <button id="removeStockBtn" class="stock-round-btn minus" type="button">−</button>
 
           <div class="pending-box">
             <span>Quantité</span>
             <strong id="pendingQuantity">0</strong>
           </div>
 
-          <button id="addStockBtn" class="stock-round-btn plus" type="button">
-            +
-          </button>
+          <button id="addStockBtn" class="stock-round-btn plus" type="button">+</button>
         </div>
 
         <button id="validateStockBtn" class="validate-stock-btn" type="button">
@@ -85,6 +89,6 @@
     </section>
   </main>
 
- <script type="module" src="index.js?v=43"></script>
+  <script type="module" src="index.js?v=70"></script>
 </body>
 </html>
