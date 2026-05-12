@@ -54,12 +54,24 @@
 
         <label>
           Famille / équipement
-          <input id="equipmentFamily" type="text" placeholder="Ex : Moniteur, Respirateur, Bistouri..." required />
+          <input
+            id="equipmentFamily"
+            type="text"
+            placeholder="Ex : Moniteur, Respirateur, Bistouri..."
+            list="formFamilyOptions"
+            required
+          />
         </label>
 
         <label>
           Type de consommable
-          <input id="consumableType" type="text" placeholder="Ex : Xénon, câble, capteur..." required />
+          <input
+            id="consumableType"
+            type="text"
+            placeholder="Ex : Xénon, câble, capteur..."
+            list="formTypeOptions"
+            required
+          />
         </label>
 
         <label>
@@ -88,7 +100,13 @@
 
         <label>
           Fournisseur
-          <input id="supplier" type="text" placeholder="Ex : Biomedisyst" required />
+          <input
+            id="supplier"
+            type="text"
+            placeholder="Ex : Biomedisyst"
+            list="formSupplierOptions"
+            required
+          />
         </label>
 
         <label>
@@ -105,6 +123,10 @@
           Notes
           <textarea id="notes" rows="3" placeholder="Informations complémentaires"></textarea>
         </label>
+
+        <datalist id="formSupplierOptions"></datalist>
+        <datalist id="formFamilyOptions"></datalist>
+        <datalist id="formTypeOptions"></datalist>
 
         <div class="form-actions full">
           <button class="btn primary" type="submit">Enregistrer le consommable</button>
@@ -228,6 +250,6 @@
     </section>
   </main>
 
-  <script type="module" src="index.js?v=70"></script>
+  <script type="module" src="index.js?v=80"></script>
 </body>
 </html>
