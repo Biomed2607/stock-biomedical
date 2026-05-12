@@ -22,7 +22,7 @@
 
       <div>
         <h1>Gestion du stock</h1>
-        <p>Création, modification et consultation des consommables biomédicaux</p>
+        <p>Création, modification, consultation et localisation des consommables biomédicaux</p>
       </div>
     </div>
 
@@ -95,7 +95,7 @@
 
         <label>
           Emplacement
-          <input id="storageLocation" type="text" placeholder="Ex : R1 – Étage 2" required />
+          <input id="storageLocation" type="text" placeholder="Ex : Rayon 1 - Étagère 2" required />
         </label>
 
         <label>
@@ -148,6 +148,10 @@
 
           <button id="showStockBtn" class="btn secondary toggle-btn" type="button">
             Afficher le stock
+          </button>
+
+          <button id="openVisualSearchBtn" class="btn primary" type="button">
+            Recherche visuelle
           </button>
 
           <button id="sendStockAlertBtn" class="btn warning" type="button">
@@ -236,12 +240,13 @@
                 <th>Emplacement</th>
                 <th>Fournisseur</th>
                 <th>Email</th>
+                <th>Actions</th>
               </tr>
             </thead>
 
             <tbody id="stockGestionTable">
               <tr>
-                <td colspan="10">Cliquez sur “Afficher le stock”.</td>
+                <td colspan="11">Cliquez sur “Afficher le stock”.</td>
               </tr>
             </tbody>
           </table>
@@ -250,6 +255,74 @@
     </section>
   </main>
 
-  <script type="module" src="index.js?v=80"></script>
+  <div id="locationModal" class="location-modal hidden" aria-hidden="true">
+    <div class="location-modal-card">
+      <button id="closeLocationModal" class="location-close-btn" type="button">×</button>
+
+      <div class="location-modal-grid">
+        <div>
+          <div class="location-kicker">Recherche visuelle</div>
+          <h2 class="location-title">Localisation du consommable</h2>
+          <p class="location-subtitle" id="locationSubtitle">
+            Sélectionnez une référence ou utilisez le bouton Localiser.
+          </p>
+
+          <div class="visual-search-box">
+            <input
+              id="visualSearchInput"
+              type="search"
+              list="visualSearchOptions"
+              placeholder="Saisir une référence ou désignation..."
+            />
+            <button id="visualSearchBtn" class="btn primary" type="button">Localiser</button>
+            <datalist id="visualSearchOptions"></datalist>
+          </div>
+
+          <div class="location-details">
+            <p><strong>Référence :</strong> <span id="locationRef">-</span></p>
+            <p><strong>Désignation :</strong> <span id="locationName">-</span></p>
+            <p><strong>Emplacement :</strong> <span id="locationPlace">-</span></p>
+            <p><strong>Fournisseur :</strong> <span id="locationSupplier">-</span></p>
+          </div>
+        </div>
+
+        <div class="rack-card">
+          <div class="rack-top">
+            <span id="rackTitle">Rayon</span>
+            <small id="rackHint">Étagère à repérer</small>
+          </div>
+
+          <div class="rack-visual">
+            <div class="rack-shelf" data-shelf="1">
+              <span>Étagère 1</span>
+              <small>Haut</small>
+            </div>
+
+            <div class="rack-shelf" data-shelf="2">
+              <span>Étagère 2</span>
+              <small>Milieu haut</small>
+            </div>
+
+            <div class="rack-shelf" data-shelf="3">
+              <span>Étagère 3</span>
+              <small>Milieu bas</small>
+            </div>
+
+            <div class="rack-shelf" data-shelf="4">
+              <span>Étagère 4</span>
+              <small>Bas</small>
+            </div>
+          </div>
+
+          <div class="location-note">
+            Les emplacements doivent idéalement être saisis sous la forme :
+            <strong>Rayon 1 - Étagère 2</strong>.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="index.js?v=90"></script>
 </body>
 </html>
