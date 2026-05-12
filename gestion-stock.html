@@ -4,19 +4,26 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>Gestion du stock — Stock Biomédical</title>
+  <title>Gestion du stock — Stock biomédical</title>
 
   <link rel="stylesheet" href="styles.css" />
 
-  <!-- Génération QR code -->
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 </head>
 
 <body>
   <header class="site-header">
-    <div>
-      <h1>Gestion du stock</h1>
-      <p>Création, modification et consultation des fiches consommables</p>
+    <div class="brand">
+      <img
+        src="hopital_prive_drome_ardeche_logo.jpeg"
+        alt="Hôpital privé Drôme Ardèche"
+        class="brand-logo"
+      />
+
+      <div>
+        <h1>Gestion du stock</h1>
+        <p>Création, modification et consultation des consommables biomédicaux</p>
+      </div>
     </div>
 
     <nav>
@@ -37,40 +44,30 @@
 
         <label>
           Référence
-          <input id="reference" type="text" placeholder="Ex : GANT-NIT-M" required />
+          <input id="reference" type="text" placeholder="Ex : 1175BF" required />
         </label>
 
         <label>
           Désignation
-          <input id="designation" type="text" placeholder="Ex : Capteur SpO2 adulte" required />
+          <input id="designation" type="text" placeholder="Ex : XENON" required />
         </label>
 
         <label>
           Famille / équipement
-          <input
-            id="equipmentFamily"
-            type="text"
-            placeholder="Ex : Moniteur multiparamétrique"
-            required
-          />
+          <input id="equipmentFamily" type="text" placeholder="Ex : Moniteur, Respirateur, Bistouri..." required />
         </label>
 
         <label>
           Type de consommable
-          <input
-            id="consumableType"
-            type="text"
-            placeholder="Ex : ECG, SpO2, PNI, câble patient..."
-            required
-          />
+          <input id="consumableType" type="text" placeholder="Ex : Xénon, câble, capteur..." required />
         </label>
 
         <label>
           Catégorie
           <select id="category" required>
             <option value="Consommable">Consommable</option>
-            <option value="piece_detachee">Pièce détachée</option>
-            <option value="autre">Autre</option>
+            <option value="Pièce détachée">Pièce détachée</option>
+            <option value="Autre">Autre</option>
           </select>
         </label>
 
@@ -86,12 +83,12 @@
 
         <label>
           Emplacement
-          <input id="storageLocation" type="text" placeholder="Ex : R1 - Étagère 1" required />
+          <input id="storageLocation" type="text" placeholder="Ex : R1 – Étage 2" required />
         </label>
 
         <label>
           Fournisseur
-          <input id="supplier" type="text" placeholder="Ex : Medline" required />
+          <input id="supplier" type="text" placeholder="Ex : Biomedisyst" required />
         </label>
 
         <label>
@@ -101,7 +98,7 @@
 
         <label>
           Email fournisseur
-          <input id="email" type="email" placeholder="fournisseur@example.com" required />
+          <input id="email" type="email" placeholder="commandes@fournisseur.fr" required />
         </label>
 
         <label class="full">
@@ -144,13 +141,15 @@
           id="supplierSearchInput"
           class="search"
           type="search"
-          placeholder="Rechercher par fournisseur..."
+          list="supplierOptions"
+          placeholder="Filtrer par fournisseur..."
         />
 
         <input
           id="familyFilter"
           class="search"
           type="search"
+          list="familyOptions"
           placeholder="Filtrer par famille..."
         />
 
@@ -158,11 +157,16 @@
           id="typeFilter"
           class="search"
           type="search"
+          list="typeOptions"
           placeholder="Filtrer par type..."
         />
+
+        <datalist id="supplierOptions"></datalist>
+        <datalist id="familyOptions"></datalist>
+        <datalist id="typeOptions"></datalist>
       </div>
 
-      <div id="itemsListContainer" class="hidden" style="margin-top: 22px;">
+      <div id="itemsListContainer" class="hidden table-section">
         <h2>Liste des consommables</h2>
 
         <div class="table-wrapper">
@@ -178,7 +182,7 @@
                 <th>Seuil</th>
                 <th>Fournisseur</th>
                 <th>Email</th>
-                <th>Prix avec/sans remise HT</th>
+                <th>Prix HT</th>
                 <th>QR code</th>
                 <th>Actions</th>
               </tr>
@@ -193,7 +197,7 @@
         </div>
       </div>
 
-      <div id="stockListContainer" class="hidden" style="margin-top: 22px;">
+      <div id="stockListContainer" class="hidden table-section">
         <h2>État du stock</h2>
 
         <div class="table-wrapper">
@@ -224,6 +228,6 @@
     </section>
   </main>
 
-  <script type="module" src="index.js?v=50"></script>
+  <script type="module" src="index.js?v=70"></script>
 </body>
 </html>
