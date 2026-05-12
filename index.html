@@ -3,14 +3,25 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Stock Biomédical</title>
+
+  <title>Accueil — Stock biomédical</title>
+
   <link rel="stylesheet" href="styles.css" />
 </head>
+
 <body>
   <header class="site-header">
-    <div>
-      <h1>Stock Biomédical</h1>
-      <p>Plateforme de gestion du stock biomédical</p>
+    <div class="brand">
+      <img
+        src="hopital_prive_drome_ardeche_logo.jpeg"
+        alt="Hôpital privé Drôme Ardèche"
+        class="brand-logo"
+      />
+
+      <div>
+        <h1>Stock biomédical</h1>
+        <p>Hôpital privé Drôme Ardèche — Clinique Pasteur — Service biomédical</p>
+      </div>
     </div>
 
     <nav>
@@ -22,38 +33,38 @@
 
   <main class="hero">
     <section class="card hero-card">
-      <h2>Bienvenue</h2>
+      <h2>Gestion simple et rapide du stock biomédical</h2>
       <p>
-        Cette application permet de gérer les fournisseurs, les consommables,
-        les entrées et sorties de stock, ainsi que les alertes de réapprovisionnement.
+        Scannez les consommables, ajoutez ou retirez du stock, consultez les niveaux
+        et recevez des alertes automatiques en cas de stock bas ou de rupture.
       </p>
 
       <div class="actions">
-        <a class="btn primary" href="stock.html">Gérer le stock</a>
-        <a class="btn secondary" href="gestion-stock.html">Gestion du stock</a>
+        <a class="btn primary" href="stock.html">Accéder au stock</a>
+        <a class="btn secondary" href="gestion-stock.html">Gérer les consommables</a>
       </div>
     </section>
 
     <section class="grid">
-      <div class="card">
-        <h3>Stock</h3>
-        <p>Entrer ou retirer des consommables avec mise à jour automatique dans Appwrite.</p>
-      </div>
+      <article class="card">
+        <h3>Scan rapide</h3>
+        <p>Utilisez la caméra ou saisissez directement la référence du consommable.</p>
+      </article>
 
-      <div class="card">
-        <h3>Gestion du stock</h3>
-        <p>Créer les fournisseurs, références, désignations, prix, quantités et seuils d’alerte.</p>
-      </div>
+      <article class="card">
+        <h3>Suivi du stock</h3>
+        <p>Visualisez rapidement les consommables disponibles, en stock bas ou en rupture.</p>
+      </article>
 
-      <div class="card">
-        <h3>Alertes</h3>
-        <p>Détecter les consommables proches de la rupture et préparer une demande de devis par email.</p>
-      </div>
+      <article class="card">
+        <h3>Alertes email</h3>
+        <p>Une alerte est envoyée automatiquement lorsqu’un seuil critique est atteint.</p>
+      </article>
     </section>
   </main>
 
   <footer>
-    <p>Stock Biomédical — GitHub Pages + Appwrite</p>
+    Stock biomédical — Hôpital privé Drôme Ardèche — Ramsay Santé
   </footer>
 </body>
 </html>
