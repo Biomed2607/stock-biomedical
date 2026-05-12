@@ -16,7 +16,7 @@
   <header class="site-header">
     <div>
       <h1>Gestion du stock</h1>
-      <p>Création, modification et suivi des consommables biomédicaux</p>
+      <p>Création, modification et consultation des fiches consommables</p>
     </div>
 
     <nav>
@@ -37,38 +37,32 @@
 
         <label>
           Référence
-          <input id="reference" type="text" placeholder="Ex : OM5402-BP44" required />
+          <input id="reference" type="text" placeholder="Ex : GANT-NIT-M" required />
         </label>
 
         <label>
           Désignation
-          <input id="designation" type="text" placeholder="Ex : Brassard enfant" required />
+          <input id="designation" type="text" placeholder="Ex : Capteur SpO2 adulte" required />
         </label>
 
         <label>
           Famille / équipement
-          <select id="equipmentFamily" required>
-            <option value="Moniteur multiparamétrique">Moniteur multiparamétrique</option>
-            <option value="Électrochirurgie">Électrochirurgie</option>
-            <option value="Respiration / ventilation">Respiration / ventilation</option>
-            <option value="Imagerie">Imagerie</option>
-            <option value="Laboratoire">Laboratoire</option>
-            <option value="Autre">Autre</option>
-          </select>
+          <input
+            id="equipmentFamily"
+            type="text"
+            placeholder="Ex : Moniteur multiparamétrique"
+            required
+          />
         </label>
 
         <label>
           Type de consommable
-          <select id="consumableType" required>
-            <option value="Capteur SpO2">Capteur SpO2</option>
-            <option value="ECG">ECG</option>
-            <option value="PNI">PNI</option>
-            <option value="Bistouri électrique">Bistouri électrique</option>
-            <option value="Câble patient">Câble patient</option>
-            <option value="Électrode">Électrode</option>
-            <option value="Sonde">Sonde</option>
-            <option value="Autre">Autre</option>
-          </select>
+          <input
+            id="consumableType"
+            type="text"
+            placeholder="Ex : ECG, SpO2, PNI, câble patient..."
+            required
+          />
         </label>
 
         <label>
@@ -81,7 +75,7 @@
         </label>
 
         <label>
-          Prix unitaire
+          Prix avec ou sans remise HT
           <input id="price" type="number" min="0" step="0.01" value="0" required />
         </label>
 
@@ -97,7 +91,7 @@
 
         <label>
           Fournisseur
-          <input id="supplier" type="text" placeholder="Ex : Biomedisyst" required />
+          <input id="supplier" type="text" placeholder="Ex : Medline" required />
         </label>
 
         <label>
@@ -125,19 +119,20 @@
     </section>
 
     <section class="card">
-      <div class="section-header gestion-toggle-header">
-        <div>
-          <h2>Consultation</h2>
-          <p class="muted-text">Afficher les fiches consommables ou l’état du stock.</p>
-        </div>
+      <div class="section-header">
+        <h2>Consultation</h2>
 
-        <div class="gestion-toggle-actions">
-          <button id="showItemsBtn" class="btn secondary" type="button">
+        <div class="view-buttons">
+          <button id="showItemsBtn" class="btn secondary toggle-btn" type="button">
             Afficher les consommables
           </button>
 
-          <button id="showStockBtn" class="btn secondary" type="button">
+          <button id="showStockBtn" class="btn secondary toggle-btn" type="button">
             Afficher le stock
+          </button>
+
+          <button id="sendStockAlertBtn" class="btn warning" type="button">
+            Envoyer alertes stock
           </button>
         </div>
       </div>
@@ -145,36 +140,33 @@
       <div class="list-tools">
         <input id="searchInput" class="search" type="search" placeholder="Rechercher..." />
 
-        <select id="familyFilter">
-          <option value="">Toutes les familles</option>
-          <option value="Moniteur multiparamétrique">Moniteur multiparamétrique</option>
-          <option value="Électrochirurgie">Électrochirurgie</option>
-          <option value="Respiration / ventilation">Respiration / ventilation</option>
-          <option value="Imagerie">Imagerie</option>
-          <option value="Laboratoire">Laboratoire</option>
-          <option value="Autre">Autre</option>
-        </select>
+        <input
+          id="supplierSearchInput"
+          class="search"
+          type="search"
+          placeholder="Rechercher par fournisseur..."
+        />
 
-        <select id="typeFilter">
-          <option value="">Tous les types</option>
-          <option value="Capteur SpO2">Capteur SpO2</option>
-          <option value="ECG">ECG</option>
-          <option value="PNI">PNI</option>
-          <option value="Bistouri électrique">Bistouri électrique</option>
-          <option value="Câble patient">Câble patient</option>
-          <option value="Électrode">Électrode</option>
-          <option value="Sonde">Sonde</option>
-          <option value="Autre">Autre</option>
-        </select>
+        <input
+          id="familyFilter"
+          class="search"
+          type="search"
+          placeholder="Filtrer par famille..."
+        />
+
+        <input
+          id="typeFilter"
+          class="search"
+          type="search"
+          placeholder="Filtrer par type..."
+        />
       </div>
 
-      <div id="itemsListContainer" class="gestion-view hidden">
-        <div class="section-header">
-          <h3>Liste des consommables</h3>
-        </div>
+      <div id="itemsListContainer" class="hidden" style="margin-top: 22px;">
+        <h2>Liste des consommables</h2>
 
         <div class="table-wrapper">
-          <table class="clean-table">
+          <table>
             <thead>
               <tr>
                 <th>Référence</th>
@@ -186,7 +178,7 @@
                 <th>Seuil</th>
                 <th>Fournisseur</th>
                 <th>Email</th>
-                <th>Prix</th>
+                <th>Prix avec/sans remise HT</th>
                 <th>QR code</th>
                 <th>Actions</th>
               </tr>
@@ -201,17 +193,11 @@
         </div>
       </div>
 
-      <div id="stockListContainer" class="gestion-view hidden">
-        <div class="section-header">
-          <h3>État du stock</h3>
-
-          <button id="sendStockAlertBtn" class="btn warning" type="button">
-            Préparer alerte email
-          </button>
-        </div>
+      <div id="stockListContainer" class="hidden" style="margin-top: 22px;">
+        <h2>État du stock</h2>
 
         <div class="table-wrapper">
-          <table class="clean-table">
+          <table>
             <thead>
               <tr>
                 <th>Stock</th>
@@ -238,6 +224,6 @@
     </section>
   </main>
 
-  <script type="module" src="index.js"></script>
+  <script type="module" src="index.js?v=50"></script>
 </body>
 </html>
