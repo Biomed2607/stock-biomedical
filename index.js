@@ -73,8 +73,8 @@ function generateInternalCode(itemCode, equipmentFamily, consumableType) {
   return `BIO-${family}-${type}-${ref}-${stamp}-${random}`.slice(0, 100);
 }
 
-function generateQrValue(internalCode) {
-  return internalCode;
+function generateQrValue(itemCode) {
+  return normalizeCode(itemCode);
 }
 
 function getSupplierEmail(item) {
@@ -200,7 +200,7 @@ function printQrCode(item) {
         <p><strong>Type :</strong> ${escapeHtml(consumableType)}</p>
         <p><strong>Emplacement :</strong> ${escapeHtml(storageLocation)}</p>
         <div id="qrcode"></div>
-        <p>${escapeHtml(qrValue)}</p>
+        <p><strong>QR :</strong> ${escapeHtml(qrValue)}</p>
       </div>
 
       <br />
@@ -287,6 +287,7 @@ async function findOrCreateSupplier({ supplier, contact, email, notes }) {
 // ==============================
 // ALERTE AUTOMATIQUE EMAIL
 // ==============================
+
 async function sendAutomaticStockAlert(item, movementType, oldQuantity, newQuantity) {
   const status = getStatus({
     ...item,
@@ -332,29 +333,9 @@ async function sendAutomaticStockAlert(item, movementType, oldQuantity, newQuant
       }
     );
 
-    console.log('Exécution alerte Appwrite :', execution);
-
-    if (execution.status !== 'completed') {
-      alert(`Alerte non envoyée : exécution Appwrite ${execution.status || 'inconnue'}.`);
+    if (execution.status && execution.status !== 'completed') {
+      alert(`Alerte non envoyée : exécution ${execution.status}.`);
       return false;
-    }
-
-    const responseBody = execution.responseBody || execution.response || '';
-
-    if (responseBody) {
-      try {
-        const parsed = JSON.parse(responseBody);
-
-        if (parsed.ok === true) {
-          return true;
-        }
-
-        alert(`Alerte non envoyée : ${parsed.message || 'erreur inconnue Function.'}`);
-        return false;
-
-      } catch {
-        console.log('Réponse Function non JSON :', responseBody);
-      }
     }
 
     return true;
@@ -795,6 +776,7 @@ function initGestionPage() {
   const message = document.querySelector('#formMessage');
   const resetBtn = document.querySelector('#resetBtn');
   const searchInput = document.querySelector('#searchInput');
+  const supplierSearchInput = document.querySelector('#supplierSearchInput');
   const familyFilter = document.querySelector('#familyFilter');
   const typeFilter = document.querySelector('#typeFilter');
 
@@ -854,6 +836,7 @@ function initGestionPage() {
 
   function getFilteredItems() {
     const term = String(searchInput?.value || '').toLowerCase();
+    const supplierTerm = String(supplierSearchInput?.value || '').toLowerCase();
     const familyValue = String(familyFilter?.value || '').toLowerCase();
     const typeValue = String(typeFilter?.value || '').toLowerCase();
 
@@ -869,15 +852,20 @@ function initGestionPage() {
         String(getSupplierEmail(item) || '').toLowerCase().includes(term) ||
         String(item.barcodeValue || '').toLowerCase().includes(term);
 
+      const matchesSupplier =
+        !supplierTerm ||
+        String(item.supplierName || '').toLowerCase().includes(supplierTerm) ||
+        String(getSupplierEmail(item) || '').toLowerCase().includes(supplierTerm);
+
       const matchesFamily =
         !familyValue ||
-        String(item.equipmentFamily || '').toLowerCase() === familyValue;
+        String(item.equipmentFamily || '').toLowerCase().includes(familyValue);
 
       const matchesType =
         !typeValue ||
-        String(item.consumableType || '').toLowerCase() === typeValue;
+        String(item.consumableType || '').toLowerCase().includes(typeValue);
 
-      return matchesSearch && matchesFamily && matchesType;
+      return matchesSearch && matchesSupplier && matchesFamily && matchesType;
     });
   }
 
@@ -1002,6 +990,8 @@ function initGestionPage() {
   }
 
   async function sendManualStockAlerts() {
+    await loadItems();
+
     const alertItems = itemsCache.filter(item => {
       const status = getStatus(item);
       return status.label === 'Rupture' || status.label === 'Stock bas';
@@ -1049,7 +1039,6 @@ function initGestionPage() {
     const notes = document.querySelector('#notes').value.trim();
 
     let internalCode = document.querySelector('#itemInternalCode').value.trim();
-    let qrValue = document.querySelector('#itemQrValue').value.trim();
 
     if (!itemCode || !itemName || !supplierName || !email || !storageLocation) {
       message.textContent = 'Veuillez remplir référence, désignation, fournisseur, email et emplacement.';
@@ -1061,9 +1050,7 @@ function initGestionPage() {
       internalCode = generateInternalCode(itemCode, equipmentFamily, consumableType);
     }
 
-    if (!qrValue) {
-      qrValue = generateQrValue(internalCode);
-    }
+    const qrValue = generateQrValue(itemCode);
 
     try {
       const supplierDoc = await findOrCreateSupplier({
@@ -1112,7 +1099,7 @@ function initGestionPage() {
         );
       }
 
-      message.textContent = 'Consommable enregistré avec succès.';
+      message.textContent = 'Consommable enregistré avec succès. QR code généré à partir de la référence.';
       message.classList.add('success');
 
       clearForm();
@@ -1165,8 +1152,9 @@ function initGestionPage() {
   resetBtn?.addEventListener('click', clearForm);
 
   searchInput?.addEventListener('input', refreshActiveView);
-  familyFilter?.addEventListener('change', refreshActiveView);
-  typeFilter?.addEventListener('change', refreshActiveView);
+  supplierSearchInput?.addEventListener('input', refreshActiveView);
+  familyFilter?.addEventListener('input', refreshActiveView);
+  typeFilter?.addEventListener('input', refreshActiveView);
 
   showItemsBtn?.addEventListener('click', showItemsView);
   showStockBtn?.addEventListener('click', showStockView);
