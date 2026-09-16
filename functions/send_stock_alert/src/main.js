@@ -4,7 +4,7 @@ export default async ({ req, res, log, error }) => {
 
     const resendApiKey = process.env.RESEND_API_KEY;
     const fromEmail = process.env.ALERT_FROM_EMAIL || 'onboarding@resend.dev';
-    const defaultToEmail = process.env.ALERT_TO_EMAIL || 'alpha.balde@ramsaysante.fr';
+    const defaultToEmail = process.env.ALERT_TO_EMAIL || 'biomed-pole2607@ramsaysante.fr';
 
     if (!resendApiKey) {
       return res.json({
