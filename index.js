@@ -20,7 +20,7 @@ const DEFAULT_EQUIPMENT_FAMILY = 'Moniteur multiparamétrique';
 const DEFAULT_CONSUMABLE_TYPE = 'Capteur SpO2';
 
 const ALERT_FUNCTION_ID = '6a01cb32002e0eed267b';
-const ALERT_EMAIL = 'alpha.balde@ramsaysante.fr';
+const ALERT_EMAIL = 'biomed-pole2607@ramsaysante.fr';
 
 const client = new Client()
   .setEndpoint(APPWRITE_ENDPOINT)
