@@ -1,3 +1,4 @@
+import { inspectAlertExecution, describeAlertError, findMatchingItems } from './stock-utils.js';
 import { Client, Databases, Functions, ID, Query } from 'https://cdn.jsdelivr.net/npm/appwrite@15.0.0/+esm';
 
 // ==============================
@@ -128,7 +129,7 @@ function renderAllQrCodes() {
 }
 
 function printQrCode(item) {
-  const qrValue = item.barcodeValue || '';
+  const qrValue = `BIOID:${item.$id}`;
   const itemCode = item.itemCode || '';
   const itemName = item.itemName || '';
   const equipmentFamily = item.equipmentFamily || '';
@@ -225,17 +226,57 @@ function printQrCode(item) {
 // APPWRITE
 // ==============================
 
-async function listItems() {
-  const response = await databases.listDocuments(
-    DATABASE_ID,
-    COLLECTIONS.items,
-    [
-      Query.orderAsc('itemCode'),
-      Query.limit(100)
-    ]
-  );
+const SNAPSHOT_KEY = 'biomed-stock-snapshot-v1';
+let usingSnapshot = false;
 
-  return response.documents || [];
+function setDataState(cached, savedAt) {
+  usingSnapshot = cached;
+  document.body.classList.toggle('read-only-stock', cached || !navigator.onLine);
+  const status = document.querySelector('#dataStatus');
+  if (status) status.textContent = cached
+    ? `Dernier stock connu du ${new Date(savedAt).toLocaleString('fr-FR')} · consultation uniquement`
+    : 'Stock actualisé · mouvements disponibles en ligne';
+}
+
+async function listItems() {
+  try {
+    if (!navigator.onLine) throw new Error('Hors connexion');
+    const items = [];
+    let cursor;
+    while (true) {
+      const queries = [Query.orderAsc('$id'), Query.limit(100)];
+      if (cursor) queries.push(Query.cursorAfter(cursor));
+      const response = await databases.listDocuments(DATABASE_ID, COLLECTIONS.items, queries);
+      const page = response.documents || [];
+      items.push(...page);
+      if (page.length < 100) break;
+      cursor = page[page.length - 1].$id;
+    }
+    items.sort((a, b) => String(a.itemCode || '').localeCompare(String(b.itemCode || ''), 'fr'));
+    const savedAt = new Date().toISOString();
+    // Offline consultation stores only article and quantity data, not supplier contacts or prices.
+    const fields = ['$id', 'itemCode', 'itemName', 'stockQuantity', 'alertThreshold',
+      'storageLocation', 'barcodeValue', 'internalCode', 'equipmentFamily', 'consumableType', 'category'];
+    try {
+      localStorage.setItem(SNAPSHOT_KEY, JSON.stringify({ savedAt,
+        items: items.map(item => Object.fromEntries(fields.map(key => [key, item[key]]))) }));
+    } catch (_) { /* Storage may be unavailable on this device. */ }
+    setDataState(false);
+    return items;
+  } catch (error) {
+    if (navigator.onLine) throw error;
+    let snapshot;
+    try { snapshot = JSON.parse(localStorage.getItem(SNAPSHOT_KEY)); } catch (_) {}
+    if (!snapshot || !Array.isArray(snapshot.items)) {
+      throw new Error('Hors connexion : ouvrez le stock une première fois avec Internet sur cet appareil.');
+    }
+    setDataState(true, snapshot.savedAt);
+    return snapshot.items;
+  }
+}
+
+function requireOnline() {
+  if (!navigator.onLine || usingSnapshot) throw new Error('Connexion et actualisation du stock nécessaires avant toute modification.');
 }
 
 async function findOrCreateSupplier({ supplier, contact, email, notes }) {
@@ -295,7 +336,7 @@ async function sendAutomaticStockAlert(item, movementType, oldQuantity, newQuant
   });
 
   if (status.label !== 'Stock bas' && status.label !== 'Rupture') {
-    return false;
+    return { state: 'skipped' };
   }
 
   const payload = {
@@ -333,17 +374,10 @@ async function sendAutomaticStockAlert(item, movementType, oldQuantity, newQuant
       }
     );
 
-    if (execution.status && execution.status !== 'completed') {
-      alert(`Alerte non envoyée : exécution ${execution.status}.`);
-      return false;
-    }
-
-    return true;
-
+    return inspectAlertExecution(execution);
   } catch (error) {
-    console.error('Erreur création exécution alerte Appwrite :', error);
-    alert(`Erreur alerte email : ${error.message || 'Impossible de lancer la Function Appwrite.'}`);
-    return false;
+    console.error('Erreur alerte Appwrite :', error);
+    return { state: 'failed', message: describeAlertError(error.message), executionId: '' };
   }
 }
 
@@ -384,6 +418,11 @@ function initStockPage() {
   let qrScanner = null;
   let scannerRunning = false;
   let lastScannedValue = '';
+  let movementBusy = false;
+  let lastAlert = null;
+  const retryAlertBtn = document.querySelector('#retryAlertBtn');
+  const alertResult = document.querySelector('#alertResult');
+  const matchChoices = document.querySelector('#matchChoices');
 
   function showNotification(message, type = '') {
     notification.textContent = message;
@@ -428,18 +467,6 @@ function initStockPage() {
     hideNotification();
   }
 
-  function findItemByCode(value) {
-    const search = String(value || '').trim().toLowerCase();
-
-    if (!search) return null;
-
-    return itemsCache.find(item =>
-      String(item.barcodeValue || '').toLowerCase() === search ||
-      String(item.internalCode || '').toLowerCase() === search ||
-      String(item.itemCode || '').toLowerCase() === search
-    );
-  }
-
   function displaySelectedItem(item) {
     selectedItem = item;
 
@@ -473,7 +500,28 @@ function initStockPage() {
       await stopScanner(false);
     }
 
-    const item = findItemByCode(cleanValue);
+    if (movementBusy) return;
+    const matches = findMatchingItems(itemsCache, cleanValue);
+    matchChoices.replaceChildren();
+    if (matches.length > 1) {
+      clearSelectedItem();
+      showNotification('Plusieurs articles portent cette référence. Choisissez le bon emplacement.', 'warning');
+      for (const candidate of matches) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'match-choice';
+        button.textContent = `${candidate.itemName} · ${candidate.storageLocation || 'Emplacement non renseigné'} · Stock : ${safeNumber(candidate.stockQuantity)}`;
+        button.addEventListener('click', () => {
+          matchChoices.replaceChildren();
+          resetPending();
+          displaySelectedItem(candidate);
+          showNotification('Article sélectionné. Choisissez + ou − puis validez.', 'success');
+        });
+        matchChoices.append(button);
+      }
+      return;
+    }
+    const item = matches[0];
 
     if (!item) {
       clearSelectedItem();
@@ -492,6 +540,7 @@ function initStockPage() {
   }
 
   function addPendingStock() {
+    if (movementBusy) return;
     if (!selectedItem) {
       showNotification('Scannez ou saisissez d’abord un code.', 'error');
       qrSearch.focus();
@@ -504,6 +553,7 @@ function initStockPage() {
   }
 
   function removePendingStock() {
+    if (movementBusy) return;
     if (!selectedItem) {
       showNotification('Scannez ou saisissez d’abord un code.', 'error');
       qrSearch.focus();
@@ -523,102 +573,92 @@ function initStockPage() {
     showPendingMessage();
   }
 
+  function showAlertResult(result) {
+    alertResult.hidden = result.state === 'skipped';
+    alertResult.className = `notification ${result.state === 'accepted' ? 'success' : 'warning'}`;
+    alertResult.textContent = result.state === 'accepted'
+      ? `Alerte acceptée par le service d’envoi pour ${ALERT_EMAIL}. Réception en boîte mail non confirmée.`
+      : `Alerte non confirmée : ${result.message || 'réponse inconnue'}`;
+    if (result.executionId) alertResult.textContent += ` Référence de diagnostic : ${result.executionId}.`;
+    retryAlertBtn.hidden = !['failed', 'unconfirmed'].includes(result.state);
+  }
+
   async function validateStockMovement() {
+    if (movementBusy) return;
     if (!selectedItem) {
-      showNotification('Scannez ou saisissez d’abord un code.', 'error');
-      qrSearch.focus();
+      showNotification('Scannez ou saisissez d’abord une référence.', 'error');
       return;
     }
-
     if (pendingDelta === 0) {
-      showNotification('Aucun mouvement à valider. Utilisez + ou −.', 'warning');
+      showNotification('Choisissez une quantité avec + ou −.', 'warning');
       return;
     }
-
-    const oldQuantity = safeNumber(selectedItem.stockQuantity);
-    const newQuantity = oldQuantity + pendingDelta;
-
-    if (newQuantity < 0) {
-      showNotification('Validation impossible : stock négatif.', 'error');
-      return;
-    }
-
-    const movementType = pendingDelta > 0 ? 'ENTREE' : 'SORTIE';
-    const movementQty = Math.abs(pendingDelta);
-
+    const itemId = selectedItem.$id;
+    const delta = pendingDelta;
+    let stockSaved = false;
     try {
-      validateStockBtn.disabled = true;
-      validateStockBtn.textContent = 'Validation...';
-
-      await databases.updateDocument(
-        DATABASE_ID,
-        COLLECTIONS.items,
-        selectedItem.$id,
-        {
-          stockQuantity: newQuantity
-        }
-      );
-
-      await databases.createDocument(
-        DATABASE_ID,
-        COLLECTIONS.movements,
-        ID.unique(),
-        {
-          itemId: selectedItem.$id,
-          itemCode: selectedItem.itemCode,
-          itemName: selectedItem.itemName,
-          movementType,
-          quantity: movementQty,
-          oldQuantity,
-          newQuantity,
-          date: new Date().toISOString(),
-          comment: '',
-          user: 'Utilisateur web'
-        }
-      );
-
-      const alertSent = await sendAutomaticStockAlert(
-        selectedItem,
-        movementType,
-        oldQuantity,
-        newQuantity
-      );
-
-      selectedItem = {
-        ...selectedItem,
-        stockQuantity: newQuantity
-      };
-
-      itemsCache = itemsCache.map(item =>
-        item.$id === selectedItem.$id ? selectedItem : item
-      );
-
-      displaySelectedItem(selectedItem);
-
-      const resultText = movementType === 'ENTREE'
-        ? `Ajout validé : +${movementQty}. Nouveau stock : ${newQuantity}.`
-        : `Retrait validé : −${movementQty}. Nouveau stock : ${newQuantity}.`;
-
-      const status = getStatus(selectedItem);
-
-      const alertText = alertSent
-        ? ` Alerte email envoyée (${status.label}).`
-        : '';
-
+      requireOnline();
+      movementBusy = true;
+      [validateStockBtn, addStockBtn, removeStockBtn, qrSearch, startScannerBtn].forEach(el => el.disabled = true);
+      validateStockBtn.textContent = 'Validation…';
+      // Read the latest quantity before writing; true cross-device transactions require a server function.
+      const freshItem = await databases.getDocument(DATABASE_ID, COLLECTIONS.items, itemId);
+      const oldQuantity = safeNumber(freshItem.stockQuantity);
+      if (oldQuantity !== safeNumber(selectedItem.stockQuantity)) {
+        displaySelectedItem(freshItem);
+        itemsCache = itemsCache.map(item => item.$id === itemId ? freshItem : item);
+        showNotification('Le stock a changé sur un autre poste. Vérifiez la quantité puis validez à nouveau.', 'warning');
+        return;
+      }
+      const newQuantity = oldQuantity + delta;
+      if (newQuantity < 0) throw new Error('Stock insuffisant pour ce retrait.');
+      const movementType = delta > 0 ? 'ENTREE' : 'SORTIE';
+      const updated = await databases.updateDocument(DATABASE_ID, COLLECTIONS.items, itemId, { stockQuantity: newQuantity });
+      stockSaved = true;
+      selectedItem = updated;
+      itemsCache = itemsCache.map(item => item.$id === itemId ? updated : item);
       resetPending();
-      showNotification(resultText + alertText, 'success');
-
-      qrSearch.focus();
-
+      displaySelectedItem(updated);
+      let historyWarning = '';
+      try {
+        await databases.createDocument(DATABASE_ID, COLLECTIONS.movements, ID.unique(), {
+          itemId, itemCode: freshItem.itemCode, itemName: freshItem.itemName, movementType,
+          quantity: Math.abs(delta), oldQuantity, newQuantity, date: new Date().toISOString(),
+          comment: '', user: 'Utilisateur web'
+        });
+      } catch (_) {
+        historyWarning = ' Attention : historique non enregistré. Ne répétez pas le mouvement.';
+      }
+      showNotification(`Mouvement enregistré : ${delta > 0 ? '+' : ''}${delta}. Stock : ${newQuantity}.${historyWarning}`, historyWarning ? 'warning' : 'success');
+      lastAlert = { item: freshItem, movementType, oldQuantity, newQuantity };
+      alertResult.hidden = false;
+      alertResult.textContent = 'Vérification de l’alerte…';
+      const result = await sendAutomaticStockAlert(freshItem, movementType, oldQuantity, newQuantity);
+      showAlertResult(result);
+      // Refresh the offline snapshot after successful writes.
+      try { itemsCache = await listItems(); } catch (_) {}
     } catch (error) {
-      console.error(error);
-      showNotification(`Erreur Appwrite : ${error.message}`, 'error');
-
+      showNotification(stockSaved
+        ? `Stock enregistré. ${error.message} Ne répétez pas le mouvement.`
+        : `Mouvement non confirmé : ${error.message} En cas de coupure réseau, actualisez le stock avant de recommencer.`, 'error');
     } finally {
-      validateStockBtn.disabled = false;
+      movementBusy = false;
+      [validateStockBtn, addStockBtn, removeStockBtn, qrSearch, startScannerBtn].forEach(el => el.disabled = false);
       validateStockBtn.textContent = 'Valider le mouvement';
     }
   }
+
+  retryAlertBtn.addEventListener('click', async () => {
+    if (!lastAlert || retryAlertBtn.disabled) return;
+    try {
+      requireOnline();
+      if (!confirm('Relancer uniquement l’alerte email ? Si un premier envoi a été accepté sans confirmation, un doublon est possible.')) return;
+      retryAlertBtn.disabled = true;
+      const { item, movementType, oldQuantity, newQuantity } = lastAlert;
+      showAlertResult(await sendAutomaticStockAlert(item, movementType, oldQuantity, newQuantity));
+    } catch (error) { showNotification(error.message, 'error'); }
+    finally { retryAlertBtn.disabled = false; }
+  });
 
   async function getBestCameraId() {
     const cameras = await window.Html5Qrcode.getCameras();
@@ -651,20 +691,15 @@ function initStockPage() {
       return;
     }
 
-    if (scannerRunning) return;
+    if (scannerRunning || movementBusy) return;
+    lastScannedValue = '';
 
     try {
       qrReader.classList.add('active');
 
       qrScanner = new window.Html5Qrcode('qrReader');
 
-      const cameraId = await getBestCameraId();
-
-      if (!cameraId) {
-        qrReader.classList.remove('active');
-        showNotification('Aucune caméra détectée. Saisissez le code manuellement.', 'error');
-        return;
-      }
+      const cameraId = { facingMode: 'environment' };
 
       await qrScanner.start(
         cameraId,
@@ -698,7 +733,10 @@ function initStockPage() {
     } catch (error) {
       console.error(error);
       qrReader.classList.remove('active');
-      showNotification(`Erreur caméra : ${error.message || error}`, 'error');
+      showNotification('Caméra indisponible ou accès refusé. Saisissez la référence ci-dessus puis appuyez sur Rechercher.', 'warning');
+      scannerRunning = false;
+      lastScannedValue = '';
+      qrSearch.focus();
     }
   }
 
@@ -736,6 +774,8 @@ function initStockPage() {
   }
 
   qrSearch.addEventListener('input', () => {
+    if (movementBusy) return;
+    matchChoices.replaceChildren();
     clearSelectedItem();
   });
 
@@ -746,6 +786,13 @@ function initStockPage() {
     handleCode(qrSearch.value, false);
   });
 
+  document.querySelector('#searchRefBtn').addEventListener('click', () => handleCode(qrSearch.value));
+  document.querySelector('#refreshStockBtn').addEventListener('click', async () => {
+    if (movementBusy) return;
+    clearSelectedItem();
+    matchChoices.replaceChildren();
+    await loadItems();
+  });
   startScannerBtn?.addEventListener('click', startScanner);
   stopScannerBtn?.addEventListener('click', () => stopScanner(true));
 
@@ -759,9 +806,7 @@ function initStockPage() {
 
   updatePendingDisplay();
 
-  loadItems().then(() => {
-    qrSearch.focus();
-  });
+  loadItems();
 }
 
 // ==============================
@@ -1090,7 +1135,7 @@ function initGestionPage() {
         <td>
           ${
             item.barcodeValue
-              ? `<div class="qr-cell" data-qr-value="${escapeHtml(item.barcodeValue)}"></div>`
+              ? `<div class="qr-cell" data-qr-value="${escapeHtml(`BIOID:${item.$id}`)}"></div>`
               : '<span>À générer</span>'
           }
         </td>
@@ -1191,35 +1236,60 @@ function initGestionPage() {
     }
   }
 
-  async function sendManualStockAlerts() {
-    await loadItems();
-
-    const alertItems = itemsCache.filter(item => {
-      const status = getStatus(item);
-      return status.label === 'Rupture' || status.label === 'Stock bas';
-    });
-
-    if (!alertItems.length) {
-      alert('Aucun consommable en stock bas ou en rupture.');
-      return;
-    }
-
-    let sentCount = 0;
-
-    for (const item of alertItems) {
-      const qty = safeNumber(item.stockQuantity);
-      const sent = await sendAutomaticStockAlert(item, 'ALERTE_MANUELLE', qty, qty);
-
-      if (sent) {
-        sentCount += 1;
-      }
-    }
-
-    alert(`${sentCount} alerte(s) envoyée(s) vers ${ALERT_EMAIL}.`);
+  const emailStatus = document.querySelector('#emailStatus');
+  function showEmailStatus(text, type = '') {
+    emailStatus.textContent = text;
+    emailStatus.className = `message ${type}`;
   }
+
+  async function sendManualStockAlerts() {
+    if (sendStockAlertBtn.disabled) return;
+    sendStockAlertBtn.disabled = true;
+    try {
+      requireOnline();
+      await loadItems();
+      const alertItems = itemsCache.filter(item => getStatus(item).label !== 'OK');
+      if (!alertItems.length) { showEmailStatus('Aucun article en alerte.'); return; }
+      if (!confirm(`Envoyer ${alertItems.length} alerte(s) à ${ALERT_EMAIL} ?`)) return;
+      let accepted = 0;
+      const failures = [];
+      for (const item of alertItems) {
+        showEmailStatus(`Envoi ${accepted + failures.length + 1}/${alertItems.length}…`);
+        const qty = safeNumber(item.stockQuantity);
+        const result = await sendAutomaticStockAlert(item, 'ALERTE_MANUELLE', qty, qty);
+        if (result.state === 'accepted') accepted++;
+        else {
+          failures.push(`${item.itemCode} : ${result.message} ${result.executionId ? `(diagnostic ${result.executionId})` : ''}`);
+          // A configuration error affects all articles: avoid a cascade of failed emails.
+          break;
+        }
+      }
+      showEmailStatus(`${accepted} alerte(s) acceptée(s) par le service d’envoi sur ${alertItems.length}. ${failures.join(' ')}${failures.length ? ' Envoi interrompu ; les articles restants n’ont pas été envoyés.' : ' Réception en boîte mail non confirmée.'}`, failures.length ? 'error' : 'success');
+    } catch (error) { showEmailStatus(error.message, 'error'); }
+    finally { sendStockAlertBtn.disabled = false; }
+  }
+
+  document.querySelector('#testEmailBtn').addEventListener('click', async event => {
+    const button = event.currentTarget;
+    if (button.disabled) return;
+    try {
+      requireOnline();
+      button.disabled = true;
+      showEmailStatus('Test d’envoi en cours…');
+      const result = await sendAutomaticStockAlert({
+        itemCode: 'TEST-EMAIL', itemName: 'TEST TECHNIQUE — aucun réapprovisionnement nécessaire',
+        alertThreshold: 1, storageLocation: 'Test sans mouvement de stock'
+      }, 'TEST_EMAIL', 0, 0);
+      showEmailStatus(result.state === 'accepted'
+        ? `Test accepté par le service d’envoi pour ${ALERT_EMAIL}. Vérifiez la boîte de réception et les indésirables.`
+        : `Test non confirmé : ${result.message}${result.executionId ? ` (diagnostic ${result.executionId})` : ''}`, result.state === 'accepted' ? 'success' : 'error');
+    } catch (error) { showEmailStatus(error.message, 'error'); }
+    finally { button.disabled = false; }
+  });
 
   form.addEventListener('submit', async event => {
     event.preventDefault();
+    try { requireOnline(); } catch (error) { message.textContent = error.message; return; }
 
     message.textContent = '';
     message.className = 'message';
@@ -1252,7 +1322,7 @@ function initGestionPage() {
       internalCode = generateInternalCode(itemCode, equipmentFamily, consumableType);
     }
 
-    const qrValue = generateQrValue(itemCode);
+    const qrValue = document.querySelector('#itemQrValue').value.trim() || internalCode;
 
     try {
       const supplierDoc = await findOrCreateSupplier({
@@ -1301,7 +1371,7 @@ function initGestionPage() {
         );
       }
 
-      message.textContent = 'Consommable enregistré avec succès. QR code généré à partir de la référence.';
+      message.textContent = 'Consommable enregistré avec succès. QR code individuel disponible.';
       message.classList.add('success');
 
       clearForm();
@@ -1342,6 +1412,7 @@ function initGestionPage() {
       if (!confirmed) return;
 
       try {
+        requireOnline();
         await databases.deleteDocument(
           DATABASE_ID,
           COLLECTIONS.items,
@@ -1405,7 +1476,8 @@ function initGestionPage() {
   });
 
   loadItems().catch(error => {
-    console.error(error);
+    message.textContent = `Chargement impossible : ${error.message}`;
+    message.className = 'message error';
   });
 }
 

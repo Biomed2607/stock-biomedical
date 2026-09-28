@@ -6,7 +6,13 @@
 
   <title>Accueil — Stock biomédical</title>
 
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=92" />
+  <meta name="theme-color" content="#0f766e" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Stock Bio" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <script src="pwa.js?v=92" defer></script>
 </head>
 
 <body>
@@ -30,6 +36,12 @@
       <a href="gestion-stock.html">Gestion du stock</a>
     </nav>
   </header>
+  <div class="app-toolbar">
+    <span id="connectionStatus" role="status"></span>
+    <button id="installAppBtn" class="btn secondary" type="button">Installer l’application</button>
+    <button id="updateAppBtn" class="btn secondary" type="button" hidden>Mettre à jour</button>
+    <p id="installHelp" hidden>Sur iPhone/iPad : ouvrez ce site dans Safari, puis Partager → Sur l’écran d’accueil. Sur Android/PC : utilisez « Installer l’application » dans le menu du navigateur.</p>
+  </div>
 
   <main class="hero">
     <section class="card hero-card">

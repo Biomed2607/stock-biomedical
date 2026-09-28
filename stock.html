@@ -6,8 +6,14 @@
 
   <title>Stock — Stock biomédical</title>
 
-  <link rel="stylesheet" href="styles.css" />
-  <script src="https://unpkg.com/html5-qrcode"></script>
+  <link rel="stylesheet" href="styles.css?v=92" />
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <meta name="theme-color" content="#0f766e" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Stock Bio" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <script src="pwa.js?v=92" defer></script>
 </head>
 
 <body class="stock-only-body">
@@ -31,6 +37,12 @@
       <a href="gestion-stock.html">Gestion du stock</a>
     </nav>
   </header>
+  <div class="app-toolbar">
+    <span id="connectionStatus" role="status"></span>
+    <button id="installAppBtn" class="btn secondary" type="button">Installer l’application</button>
+    <button id="updateAppBtn" class="btn secondary" type="button" hidden>Mettre à jour</button>
+    <p id="installHelp" hidden>Sur iPhone/iPad : ouvrez ce site dans Safari, puis Partager → Sur l’écran d’accueil. Sur Android/PC : utilisez « Installer l’application » dans le menu du navigateur.</p>
+  </div>
 
   <main class="stock-page">
     <section class="stock-terminal">
@@ -40,6 +52,8 @@
       </div>
 
       <div class="stock-terminal-body">
+        <label class="manual-ref-label" for="qrSearch">Référence ou code de l’article</label>
+        <div class="manual-ref-row">
         <div class="scan-input-wrapper">
           <input
             id="qrSearch"
@@ -47,14 +61,19 @@
             type="text"
             placeholder="Scanner ou saisir une référence..."
             autocomplete="off"
-            autofocus
+            enterkeyhint="search"
+            autocapitalize="characters"
           />
           <span class="scan-input-icon">📷</span>
         </div>
 
+        <button id="searchRefBtn" class="btn primary" type="button">Rechercher</button>
+        </div>
+        <p class="scan-help">Saisissez la référence puis Rechercher, ou utilisez la caméra.</p>
+        <div id="matchChoices" aria-live="polite"></div>
         <div class="camera-row">
           <button id="startScannerBtn" class="camera-main-btn" type="button">
-            📸 Ouvrir caméra
+            📸 Scanner un QR code
           </button>
 
           <button id="stopScannerBtn" class="camera-main-btn danger" type="button">
@@ -84,11 +103,17 @@
           Valider le mouvement
         </button>
 
-        <div id="stockNotification" class="notification" style="display: none;"></div>
+        <div id="stockNotification" class="notification" role="status" style="display: none;"></div>
+        <div id="alertResult" role="status" hidden></div>
+        <button id="retryAlertBtn" class="btn warning" type="button" hidden>Relancer uniquement l’alerte email</button>
+        <div class="stock-data-footer">
+          <p id="dataStatus" role="status">Chargement du stock…</p>
+          <button id="refreshStockBtn" class="btn secondary" type="button">Actualiser le stock</button>
+        </div>
       </div>
     </section>
   </main>
 
-  <script type="module" src="index.js?v=91"></script>
+  <script type="module" src="index.js?v=92"></script>
 </body>
 </html>

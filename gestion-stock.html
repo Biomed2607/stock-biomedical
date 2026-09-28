@@ -6,9 +6,15 @@
 
   <title>Gestion du stock — Stock biomédical</title>
 
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=92" />
 
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <meta name="theme-color" content="#0f766e" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Stock Bio" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <script src="pwa.js?v=92" defer></script>
 </head>
 
 <body>
@@ -32,6 +38,12 @@
       <a href="gestion-stock.html">Gestion du stock</a>
     </nav>
   </header>
+  <div class="app-toolbar">
+    <span id="connectionStatus" role="status"></span>
+    <button id="installAppBtn" class="btn secondary" type="button">Installer l’application</button>
+    <button id="updateAppBtn" class="btn secondary" type="button" hidden>Mettre à jour</button>
+    <p id="installHelp" hidden>Sur iPhone/iPad : ouvrez ce site dans Safari, puis Partager → Sur l’écran d’accueil. Sur Android/PC : utilisez « Installer l’application » dans le menu du navigateur.</p>
+  </div>
 
   <main class="container">
     <section class="card">
@@ -140,6 +152,7 @@
     <section class="card">
       <div class="section-header">
         <h2>Consultation</h2>
+        <p id="dataStatus" role="status">Chargement du stock…</p>
 
         <div class="view-buttons">
           <button id="showItemsBtn" class="btn secondary toggle-btn" type="button">
@@ -157,9 +170,11 @@
           <button id="sendStockAlertBtn" class="btn warning" type="button">
             Envoyer alertes stock
           </button>
+          <button id="testEmailBtn" class="btn secondary" type="button">Tester l’email du pôle</button>
         </div>
       </div>
 
+      <p id="emailStatus" class="message" role="status" aria-live="polite"></p>
       <div class="list-tools">
         <input id="searchInput" class="search" type="search" placeholder="Rechercher..." />
 
@@ -323,6 +338,6 @@
     </div>
   </div>
 
-  <script type="module" src="index.js?v=91"></script>
+  <script type="module" src="index.js?v=92"></script>
 </body>
 </html>

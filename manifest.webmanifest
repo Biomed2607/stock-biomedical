@@ -1,0 +1,17 @@
+{
+  "id": "./",
+  "name": "Stock biomédical — HPDA",
+  "short_name": "Stock Bio",
+  "description": "Scanner ou saisir une référence et gérer le stock biomédical.",
+  "lang": "fr",
+  "start_url": "./stock.html",
+  "scope": "./",
+  "display": "standalone",
+  "theme_color": "#0f766e",
+  "background_color": "#f7faf8",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "shortcuts": [{ "name": "Scanner / saisir", "url": "./stock.html" }, { "name": "Consulter le stock", "url": "./gestion-stock.html" }]
+}

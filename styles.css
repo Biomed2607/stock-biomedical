@@ -1091,3 +1091,58 @@ footer {
     grid-template-columns: 1fr;
   }
 }
+
+/* Application mobile et PWA */
+[hidden] { display: none !important; }
+button, a, input { touch-action: manipulation; }
+button:disabled { opacity: .55; cursor: wait; }
+.app-toolbar { width: min(1180px, calc(100% - 24px)); margin: 0 auto; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.app-toolbar .btn { padding: 9px 14px; font-size: .85rem; }
+#connectionStatus { font-size: .85rem; font-weight: 700; color: var(--primary-dark); margin-right: auto; }
+#connectionStatus.offline { color: #92400e; }
+#installHelp { width: 100%; margin: 0; padding: 12px; background: var(--accent-soft); border-radius: 12px; font-size: .9rem; }
+.manual-ref-label { display: block; margin-bottom: 8px; font-weight: 750; }
+.manual-ref-row { display: flex; gap: 8px; align-items: stretch; }
+.manual-ref-row .scan-input-wrapper { flex: 1; min-width: 0; margin: 0; }
+.manual-ref-row .scan-input-main { width: 100%; font-size: 16px; padding: 14px 36px 14px 12px; }
+.manual-ref-row .btn { padding: 12px; }
+.scan-help, #dataStatus { font-size: .85rem; line-height: 1.5; color: var(--muted); }
+.match-choice { width: 100%; padding: 14px; margin-bottom: 8px; border: 1px solid var(--primary); border-radius: 12px; background: var(--primary-soft); text-align: left; font: inherit; cursor: pointer; }
+#alertResult { display: block; overflow-wrap: anywhere; margin-top: 12px; }
+#emailStatus { white-space: pre-wrap; overflow-wrap: anywhere; }
+#retryAlertBtn { margin-top: 10px; width: 100%; white-space: normal; }
+.stock-data-footer { border-top: 1px solid var(--border); margin-top: 20px; padding-top: 8px; }
+.offline #validateStockBtn, .read-only-stock #validateStockBtn,
+.offline #itemForm, .read-only-stock #itemForm,
+.offline #sendStockAlertBtn, .read-only-stock #sendStockAlertBtn,
+.offline #testEmailBtn, .read-only-stock #testEmailBtn,
+.offline [data-delete], .read-only-stock [data-delete],
+.offline [data-edit], .read-only-stock [data-edit] { opacity: .45; pointer-events: none; }
+@media (max-width: 640px) {
+  .site-header, .stock-centered-header { padding: 12px 0 8px; gap: 12px; }
+  .brand { flex-direction: row; text-align: left; gap: 10px; width: 100%; }
+  .brand-logo { width: 48px; height: 48px; padding: 4px; border-radius: 12px; }
+  .site-header h1 { font-size: 1.4rem; }
+  .site-header .brand p { font-size: .78rem; margin: 5px 0 0; }
+  nav { width: 100%; padding: 4px; justify-content: space-between; gap: 0; }
+  nav a { padding: 10px 9px; font-size: .8rem; min-height: 44px; }
+  .app-toolbar { gap: 8px; }
+  .stock-page { padding: 12px 12px max(24px, env(safe-area-inset-bottom)); min-height: auto; }
+  .stock-terminal { max-width: 100%; border-radius: 20px; }
+  .stock-terminal-header { padding: 14px; }
+  .stock-terminal-header h2 { font-size: 1.25rem; margin-bottom: 4px; }
+  .stock-terminal-header p { font-size: .85rem; }
+  .stock-terminal-body { padding: 16px; }
+  .camera-row { margin: 12px 0; }
+  .camera-main-btn { min-height: 48px; padding: 12px; font-size: 1rem; width: 100%; }
+  .current-item-card { margin: 12px 0; padding: 14px; }
+  .current-code { font-size: 1.35rem; overflow-wrap: anywhere; }
+  .stock-counter { grid-template-columns: 1fr 80px 1fr; gap: 12px; margin: 14px 0; }
+  .stock-round-btn { width: 68px; height: 68px; font-size: 2.5rem; justify-self: center; }
+  .pending-box { min-height: 64px; }
+  .validate-stock-btn { min-height: 50px; padding: 14px; font-size: 1rem; }
+  .view-buttons { width: 100%; display: grid; grid-template-columns: 1fr; }
+  .view-buttons .btn { width: 100%; min-height: 44px; }
+  input, select, textarea { font-size: 16px !important; }
+  .card { padding: 16px; }
+}

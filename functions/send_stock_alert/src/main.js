@@ -1,10 +1,14 @@
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+}
+
 export default async ({ req, res, log, error }) => {
   try {
     log('Function send_stock_alert démarrée avec Resend API');
 
     const resendApiKey = process.env.RESEND_API_KEY;
     const fromEmail = process.env.ALERT_FROM_EMAIL || 'onboarding@resend.dev';
-    const defaultToEmail = process.env.ALERT_TO_EMAIL || 'biomed-pole2607@ramsaysante.fr';
+    const alertRecipient = 'biomed-pole2607@ramsaysante.fr';
 
     if (!resendApiKey) {
       return res.json({
@@ -14,14 +18,14 @@ export default async ({ req, res, log, error }) => {
     }
 
     let payload = {};
-
-    if (typeof req.body === 'string') {
-      payload = JSON.parse(req.body || '{}');
-    } else if (typeof req.body === 'object' && req.body !== null) {
-      payload = req.body;
+    try {
+      const body = req.bodyJson ?? req.bodyText ?? req.body;
+      payload = typeof body === 'string' ? JSON.parse(body || '{}') : (body || {});
+    } catch (_) {
+      return res.json({ ok: false, message: 'Requête JSON invalide.' }, 400);
     }
-
-    const to = payload.to || defaultToEmail;
+    // The browser cannot redirect alerts to arbitrary recipients.
+    const to = alertRecipient;
     const status = payload.status || 'Alerte stock';
     const movementType = payload.movementType || 'MOUVEMENT';
     const item = payload.item || {};
@@ -29,8 +33,7 @@ export default async ({ req, res, log, error }) => {
     if (!item.itemCode || !item.itemName) {
       return res.json({
         ok: false,
-        message: 'Payload incomplet : itemCode et itemName sont obligatoires.',
-        received: payload
+        message: 'Payload incomplet : itemCode et itemName sont obligatoires.'
       }, 400);
     }
 
@@ -40,7 +43,8 @@ export default async ({ req, res, log, error }) => {
       ? 'Rupture de stock détectée'
       : 'Stock bas détecté';
 
-    const subject = `[Stock biomédical] ${status} — ${item.itemCode}`;
+    const isTest = movementType === 'TEST_EMAIL';
+    const subject = isTest ? '[Stock biomédical] Test de configuration email' : `[Stock biomédical] ${status} — ${item.itemCode}`;
 
     const plainText = `
 ${isRupture ? 'Une rupture de stock a été détectée' : 'Un stock bas a été détecté'} pour le consommable suivant :
@@ -87,35 +91,35 @@ Service biomédical
         <table style="border-collapse: collapse; width: 100%; max-width: 720px;">
           <tr>
             <td style="padding: 6px 0;"><strong>Référence :</strong></td>
-            <td>${item.itemCode || '-'}</td>
+            <td>${escapeHtml(item.itemCode || '-')}</td>
           </tr>
           <tr>
             <td style="padding: 6px 0;"><strong>Désignation :</strong></td>
-            <td>${item.itemName || '-'}</td>
+            <td>${escapeHtml(item.itemName || '-')}</td>
           </tr>
           <tr>
             <td style="padding: 6px 0;"><strong>Catégorie :</strong></td>
-            <td>${item.category || '-'}</td>
+            <td>${escapeHtml(item.category || '-')}</td>
           </tr>
           <tr>
             <td style="padding: 6px 0;"><strong>Emplacement :</strong></td>
-            <td>${item.storageLocation || '-'}</td>
+            <td>${escapeHtml(item.storageLocation || '-')}</td>
           </tr>
           <tr>
             <td style="padding: 6px 0;"><strong>Stock actuel :</strong></td>
-            <td>${item.stockQuantity ?? item.newQuantity ?? '-'}</td>
+            <td>${escapeHtml(item.stockQuantity ?? item.newQuantity ?? '-')}</td>
           </tr>
           <tr>
             <td style="padding: 6px 0;"><strong>Seuil d’alerte :</strong></td>
-            <td>${item.alertThreshold ?? '-'}</td>
+            <td>${escapeHtml(item.alertThreshold ?? '-')}</td>
           </tr>
           <tr>
             <td style="padding: 6px 0;"><strong>Fournisseur :</strong></td>
-            <td>${item.supplierName || '-'}</td>
+            <td>${escapeHtml(item.supplierName || '-')}</td>
           </tr>
           <tr>
             <td style="padding: 6px 0;"><strong>Email :</strong></td>
-            <td>${item.supplierEmail || '-'}</td>
+            <td>${escapeHtml(item.supplierEmail || '-')}</td>
           </tr>
         </table>
 
@@ -132,8 +136,8 @@ Service biomédical
         </p>
 
         <p>
-          <strong>Référence :</strong> ${item.itemCode || '-'}<br />
-          <strong>Désignation :</strong> ${item.itemName || '-'}<br />
+          <strong>Référence :</strong> ${escapeHtml(item.itemCode || '-')}<br />
+          <strong>Désignation :</strong> ${escapeHtml(item.itemName || '-')}<br />
           <strong>Quantité souhaitée :</strong> [à compléter]
         </p>
 
@@ -149,6 +153,7 @@ Service biomédical
 
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
+      signal: AbortSignal.timeout(15000),
       headers: {
         Authorization: `Bearer ${resendApiKey}`,
         'Content-Type': 'application/json'
@@ -157,8 +162,8 @@ Service biomédical
         from: `Stock Biomédical <${fromEmail}>`,
         to: [to],
         subject,
-        html,
-        text: plainText
+        html: isTest ? '<p>Test du service d’alerte biomédical. Aucun mouvement de stock ni réapprovisionnement à effectuer.</p>' : html,
+        text: isTest ? 'Test du service d’alerte biomédical. Aucun mouvement de stock ni réapprovisionnement à effectuer.' : plainText
       })
     });
 
@@ -169,7 +174,8 @@ Service biomédical
 
       return res.json({
         ok: false,
-        message: 'Erreur Resend.',
+        message: result.message || 'Erreur du fournisseur email.',
+        providerStatus: response.status,
         error: result
       }, 500);
     }
@@ -178,7 +184,8 @@ Service biomédical
 
     return res.json({
       ok: true,
-      message: 'Alerte email envoyée avec Resend.',
+      message: 'Alerte acceptée par Resend. Livraison non confirmée.',
+      recipient: to,
       id: result.id
     });
 
