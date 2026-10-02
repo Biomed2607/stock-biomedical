@@ -11,7 +11,7 @@ Interface hébergée sur GitHub Pages ; données et fonction email sur Appwrite 
 - Navigation et filtres restent accessibles pendant le défilement. Le bouton Haut permet de remonter rapidement.
 - Si plusieurs fiches partagent la référence, choisir explicitement l’article et son emplacement. Les nouvelles impressions QR utilisent `BIOID:<identifiant de fiche>` ; les anciennes références restent reconnues.
 - Le dernier stock consulté est enregistré sur cet appareil (sans contacts fournisseurs ni prix). Une première visite connectée et l’installation complète du service worker sont nécessaires pour consulter hors connexion. Aucune modification n’est mise en attente hors ligne.
-- Après un retour du réseau, actualiser le stock. Les mises à jour de l’application s’appliquent avec le bouton **Mettre à jour**, après avoir terminé le mouvement en cours.
+- Après un retour du réseau, actualiser le stock. Les nouvelles versions s’activent automatiquement et les pages se mettent à jour à la prochaine navigation ou ouverture en ligne. Une saisie en cours n’est pas rechargée automatiquement ; **Mettre à jour** permet de recharger après l’avoir terminée. Hors connexion, la page demandée est conservée en cache.
 
 ## Alertes : diagnostic et déploiement
 

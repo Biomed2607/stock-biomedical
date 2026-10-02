@@ -122,3 +122,58 @@ test('PWA script works on pages without installation controls', async () => {
   handlers.appinstalled();
   context.navigator.onLine=false;handlers.offline();assert.match(label.textContent,/Hors connexion/);
 });
+
+test('PWA upgrades automatically, refreshes stale HTML and keeps each page available offline', async () => {
+  const source=await readFile(new URL('../sw.js',import.meta.url),'utf8');
+  const handlers={}; const entries=new Map(); const requests=[]; let offline=false; let skips=0;
+  const scope='https://example.test/stock-biomedical/';
+  const key = request => typeof request==='string' ? request : request.url;
+  const cache={
+    async put(request,response){entries.set(key(request),response.clone());},
+    async match(request){return entries.get(key(request))?.clone();},
+    async addAll(requests){for(const request of requests)await this.put(request,new Response('cdn'));}
+  };
+  const context=vm.createContext({URL,Request,Response,AbortSignal,Date,
+    self:{registration:{scope},location:{origin:'https://example.test'},clients:{claim:async()=>{}},skipWaiting:async()=>{skips++},addEventListener:(type,fn)=>handlers[type]=fn},
+    caches:{open:async()=>cache,keys:async()=>[],delete:async()=>true},
+    fetch:async request=>{requests.push(request);if(offline)throw new Error('offline');return new Response('fresh:'+new URL(request.url).pathname);}
+  });
+  vm.runInContext(source,context);
+  let installation;handlers.install({waitUntil:promise=>installation=promise});await installation;
+  assert.equal(skips,1);
+  assert.ok([...entries.keys()].every(url=>!url.includes('__pwa')));
+  assert.ok(requests.every(request=>request.cache==='reload'));
+  const visit=async(path,mode='navigate')=>{
+    let result;handlers.fetch({request:{url:new URL(path,scope).href,method:'GET',mode},respondWith:promise=>result=promise});
+    return result;
+  };
+  entries.set(scope+'gestion-stock.html',new Response('obsolete HTML'));
+  assert.equal(await (await visit('gestion-stock.html')).text(),'fresh:/stock-biomedical/gestion-stock.html');
+  assert.equal(requests.at(-1).cache,'no-store');
+  offline=true;
+  assert.equal(await (await visit('gestion-stock.html')).text(),'fresh:/stock-biomedical/gestion-stock.html');
+  assert.equal(await (await visit('ajouter-consommable.html')).text(),'fresh:/stock-biomedical/ajouter-consommable.html');
+  assert.equal(await (await visit('./')).text(),'fresh:/stock-biomedical/index.html');
+  // A different asset version must not silently reuse an older cached script.
+  await assert.rejects(visit('pwa.js?v=999','cors'),/offline/);
+  let intercepted=false;
+  handlers.fetch({request:{url:'https://cloud.appwrite.io/v1/databases',method:'GET'},respondWith(){intercepted=true;}});
+  assert.equal(intercepted,false);
+});
+
+test('A background worker update never reloads a form without an explicit click', async () => {
+  const source=await readFile(new URL('../pwa.js',import.meta.url),'utf8');
+  const handlers={};let reloads=0;let checks=0;
+  const button={hidden:true};
+  const label={textContent:'',classList:{toggle(){}}};
+  const reg={waiting:null,addEventListener(){},update:async()=>{checks++}};
+  const context=vm.createContext({
+    document:{querySelector:id=>id==='#connectionStatus'?label:id==='#updateAppBtn'?button:null,body:{classList:{toggle(){}}},addEventListener(){},visibilityState:'visible'},
+    navigator:{onLine:true,serviceWorker:{controller:{},register:async()=>reg,addEventListener:(key,fn)=>handlers[key]=fn}},
+    window:{addEventListener(){},matchMedia:()=>({matches:false})},
+    location:{reload(){reloads++}},confirm:()=>true
+  });
+  vm.runInContext(source,context);await new Promise(resolve=>setImmediate(resolve));
+  handlers.controllerchange();assert.equal(reloads,0);assert.equal(button.hidden,false);
+  button.onclick();assert.equal(reloads,1);assert.equal(checks,1);
+});

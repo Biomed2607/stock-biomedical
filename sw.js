@@ -1,22 +1,32 @@
-const CACHE = 'biomed-pwa-v3';
+const CACHE = 'biomed-pwa-v4';
 const LOCAL_FILES = ['./', './index.html', './stock.html', './gestion-stock.html', './ajouter-consommable.html', './styles.css?v=93',
-  './index.js?v=93', './stock-utils.js', './pwa.js?v=93', './manifest.webmanifest',
+  './index.js?v=93', './stock-utils.js', './pwa.js?v=94', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',
   './hopital_prive_drome_ardeche_logo.jpeg'];
 const CDN_FILES = ['https://cdn.jsdelivr.net/npm/appwrite@15.0.0/+esm',
   'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js',
   'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js'];
+// Keep application version parameters: ?v=94 must never match a cached ?v=93.
+function cacheKey(input) {
+  const url = new URL(typeof input === 'string' ? input : input.url, self.registration.scope);
+  url.searchParams.delete('__pwa');
+  if (url.pathname === new URL(self.registration.scope).pathname) url.pathname += 'index.html';
+  return url.href;
+}
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE);
-    // The SDK is necessary to start the application offline. Do not mark an incomplete installation ready.
-    // A new worker must not seed its cache with HTML from the browser HTTP cache.
-    const freshLocalRequests = LOCAL_FILES.map(path => {
+    // Fetch fresh bytes but store canonical URLs for reliable offline lookup.
+    await Promise.all(LOCAL_FILES.map(async path => {
       const url = new URL(path, self.registration.scope);
-      url.searchParams.set('release', CACHE);
-      return new Request(url, { cache: 'reload' });
-    });
-    await cache.addAll([...freshLocalRequests, ...CDN_FILES.map(url => new Request(url, { cache: 'reload' }))]);
+      url.searchParams.set('__pwa', CACHE);
+      const response = await fetch(new Request(url, { cache: 'reload' }));
+      if (!response.ok) throw new Error(`Installation impossible : ${path}`);
+      await cache.put(cacheKey(url.href), response);
+    }));
+    await cache.addAll(CDN_FILES.map(url => new Request(url, { cache: 'reload' })));
+    // Existing installations must not stay indefinitely on the old interface.
+    await self.skipWaiting();
   })());
 });
 self.addEventListener('activate', event => event.waitUntil((async () => {
@@ -34,16 +44,28 @@ self.addEventListener('fetch', event => {
   if (!local && !cdn) return;
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
-    const cached = await cache.match(request, { ignoreSearch: local });
-    // Serve a consistent version of the application until the user accepts the next service worker.
-    if (cached) return cached;
-    try {
-      const response = await fetch(request);
-      if (response.ok && (cdn || /\.(?:js|css|png|jpeg|html)$/.test(url.pathname))) await cache.put(request, response.clone());
-      return response;
-    } catch (error) {
-      if (request.mode === 'navigate') return await cache.match(new URL('./stock.html', self.registration.scope).href, { ignoreSearch: true });
-      throw error;
+    const key = local ? cacheKey(request) : request;
+    const cached = await cache.match(key);
+    const page = local && (request.mode === 'navigate' || /\.html$/.test(url.pathname));
+    // Online navigation gets current HTML; offline navigation keeps the requested page.
+    if (page) {
+      const fresh = new URL(request.url);
+      fresh.searchParams.set('__pwa', String(Date.now()));
+      try {
+        const response = await fetch(new Request(fresh, { cache: 'no-store', signal: AbortSignal.timeout(5000) }));
+        if (response.ok) {
+          await cache.put(key, response.clone());
+          return response;
+        }
+        return cached || response;
+      } catch (error) {
+        if (cached) return cached;
+        throw error;
+      }
     }
+    if (cached) return cached;
+    const response = await fetch(request);
+    if (response.ok && (cdn || /\.(?:js|css|png|jpeg|webmanifest)$/.test(url.pathname))) await cache.put(key, response.clone());
+    return response;
   })());
 });

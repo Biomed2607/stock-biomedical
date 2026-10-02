@@ -27,23 +27,40 @@ installButton?.addEventListener('click', async () => {
 });
 if (window.matchMedia('(display-mode: standalone)').matches || navigator.standalone) if (installButton) installButton.hidden = true;
 if ('serviceWorker' in navigator) {
+  const hadController = !!navigator.serviceWorker.controller;
   navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(reg => {
-    function offerUpdate() {
-      if (!reg.waiting || !navigator.serviceWorker.controller) return;
-      const button = document.querySelector('#updateAppBtn');
-      button.hidden = false;
-      button.onclick = () => { if (confirm('Recharger l’application ? Terminez d’abord votre mouvement en cours.')) reg.waiting.postMessage({ type: 'SKIP_WAITING' }); };
-    }
-    offerUpdate();
-    reg.addEventListener('updatefound', () => {
-      reg.installing?.addEventListener('statechange', offerUpdate);
-    });
+    let reloadRequested = false;
     let reloading = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (reloading) return;
-      // Initial installation needs no reload. Reload only for a user-approved update.
-      if (!document.querySelector('#updateAppBtn').hidden) { reloading = true; location.reload(); }
+    const button = document.querySelector('#updateAppBtn');
+    function offerUpdate() {
+      if (!button) return;
+      button.hidden = false;
+      button.onclick = () => {
+        if (!confirm('Recharger l’application ? Terminez d’abord votre mouvement en cours.')) return;
+        reloadRequested = true;
+        if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        else location.reload();
+      };
+    }
+    if (reg.waiting && hadController) offerUpdate();
+    reg.addEventListener('updatefound', () => {
+      reg.installing?.addEventListener('statechange', () => {
+        if (reg.waiting && navigator.serviceWorker.controller) offerUpdate();
+      });
     });
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      // A background update must not erase an unsaved form or stock movement.
+      // Fresh pages load automatically on the next navigation/opening.
+      if (!hadController || reloading) return;
+      if (reloadRequested) { reloading = true; location.reload(); }
+      else offerUpdate();
+    });
+    const checkUpdate = () => { if (navigator.onLine) reg.update().catch(() => {}); };
+    window.addEventListener('online', checkUpdate);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') checkUpdate();
+    });
+    checkUpdate();
   }).catch(() => {
     const help = document.querySelector('#installHelp');
     if (help) help.textContent = 'Le mode hors connexion n’est pas disponible dans ce navigateur. Le site reste utilisable en ligne.';
