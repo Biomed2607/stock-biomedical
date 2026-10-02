@@ -26,40 +26,73 @@ installButton?.addEventListener('click', async () => {
   }
 });
 if (window.matchMedia('(display-mode: standalone)').matches || navigator.standalone) if (installButton) installButton.hidden = true;
+// Increment with CACHE in sw.js for every published application release.
+const APP_VERSION = 'biomed-pwa-v6';
+let updateNoticeTimer;
+function showUpdateNotice(updated) {
+  let notice = document.querySelector('#appUpdateNotice');
+  if (!notice) {
+    notice = document.createElement('div');
+    notice.id = 'appUpdateNotice';
+    notice.className = 'app-update-notice';
+    notice.setAttribute('role', 'status');
+    notice.setAttribute('aria-live', 'polite');
+    notice.setAttribute('aria-atomic', 'true');
+    document.body.append(notice);
+  }
+  notice.textContent = updated
+    ? '✓ Application mise à jour'
+    : '↻ Mise à jour prête · Elle s’appliquera à la prochaine ouverture ou navigation.';
+  notice.hidden = false;
+  window.clearTimeout(updateNoticeTimer);
+  updateNoticeTimer = window.setTimeout(() => { notice.hidden = true; }, 5000);
+}
 if ('serviceWorker' in navigator) {
   const hadController = !!navigator.serviceWorker.controller;
+  // Remember the version actually loaded, not merely downloaded in the background.
+  let previousVersion = null;
+  try {
+    previousVersion = localStorage.getItem('biomed-app-version');
+    localStorage.setItem('biomed-app-version', APP_VERSION);
+  } catch (_) { /* Private browsing may make storage unavailable. */ }
+  if ((previousVersion && previousVersion !== APP_VERSION) || (!previousVersion && hadController)) {
+    showUpdateNotice(true);
+  }
   navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(reg => {
-    let reloadRequested = false;
-    let reloading = false;
-    const button = document.querySelector('#updateAppBtn');
-    function offerUpdate() {
-      if (!button) return;
-      button.hidden = false;
-      button.onclick = () => {
-        if (!confirm('Recharger l’application ? Terminez d’abord votre mouvement en cours.')) return;
-        reloadRequested = true;
-        if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-        else location.reload();
-      };
-    }
-    if (reg.waiting && hadController) offerUpdate();
-    reg.addEventListener('updatefound', () => {
-      reg.installing?.addEventListener('statechange', () => {
-        if (reg.waiting && navigator.serviceWorker.controller) offerUpdate();
-      });
+    let offeredVersion = null;
+    const readVersion = worker => worker?.postMessage({ type: 'GET_APP_VERSION' });
+    navigator.serviceWorker.addEventListener('message', event => {
+      if (event.data?.type !== 'APP_VERSION') return;
+      const version = event.data.version;
+      const number = /^biomed-pwa-v(\d+)$/.exec(version || '');
+      if (!number || Number(number[1]) <= Number(APP_VERSION.split('-v')[1])) return;
+      // One brief notice per detected version; never interrupt a stock movement.
+      if (offeredVersion === version) return;
+      offeredVersion = version;
+      showUpdateNotice(false);
     });
+    const watchWorker = worker => {
+      if (!worker) return;
+      worker.addEventListener('statechange', () => {
+        if (worker.state === 'installed' || worker.state === 'activated') readVersion(worker);
+      });
+      if (worker.state === 'installed' || worker.state === 'activated') readVersion(worker);
+    };
+    watchWorker(reg.installing);
+    readVersion(reg.waiting);
+    readVersion(navigator.serviceWorker.controller);
+    reg.addEventListener('updatefound', () => watchWorker(reg.installing));
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      // A background update must not erase an unsaved form or stock movement.
-      // Fresh pages load automatically on the next navigation/opening.
-      if (!hadController || reloading) return;
-      if (reloadRequested) { reloading = true; location.reload(); }
-      else offerUpdate();
+      readVersion(navigator.serviceWorker.controller);
     });
     const checkUpdate = () => { if (navigator.onLine) reg.update().catch(() => {}); };
     window.addEventListener('online', checkUpdate);
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') checkUpdate();
     });
+    window.setInterval(() => {
+      if (document.visibilityState === 'visible') checkUpdate();
+    }, 5 * 60 * 1000);
     checkUpdate();
   }).catch(() => {
     const help = document.querySelector('#installHelp');

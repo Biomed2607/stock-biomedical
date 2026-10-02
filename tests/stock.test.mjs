@@ -161,19 +161,49 @@ test('PWA upgrades automatically, refreshes stale HTML and keeps each page avail
   assert.equal(intercepted,false);
 });
 
-test('A background worker update never reloads a form without an explicit click', async () => {
-  const source=await readFile(new URL('../pwa.js',import.meta.url),'utf8');
-  const handlers={};let reloads=0;let checks=0;
-  const button={hidden:true};
-  const label={textContent:'',classList:{toggle(){}}};
-  const reg={waiting:null,addEventListener(){},update:async()=>{checks++}};
-  const context=vm.createContext({
-    document:{querySelector:id=>id==='#connectionStatus'?label:id==='#updateAppBtn'?button:null,body:{classList:{toggle(){}}},addEventListener(){},visibilityState:'visible'},
-    navigator:{onLine:true,serviceWorker:{controller:{},register:async()=>reg,addEventListener:(key,fn)=>handlers[key]=fn}},
-    window:{addEventListener(){},matchMedia:()=>({matches:false})},
-    location:{reload(){reloads++}},confirm:()=>true
+async function loadPwaNotice(storage = new Map(), controlled = true) {
+  const source = await readFile(new URL('../pwa.js', import.meta.url), 'utf8');
+  const handlers = {}; const timers = new Map(); const nodes = new Map();
+  let timerId = 0; let reloads = 0;
+  const label = {textContent:'', classList:{toggle(){}}};
+  const controller = {postMessage(){}};
+  const reg = {waiting:null, installing:null, addEventListener(){}, update:async()=>{}};
+  const context = vm.createContext({
+    document:{querySelector:id=>id==='#connectionStatus'?label:nodes.get(id)||null,
+      createElement:()=>({setAttribute(){},hidden:false}),
+      body:{classList:{toggle(){}},append:node=>nodes.set('#'+node.id,node)},
+      addEventListener(){},visibilityState:'visible'},
+    navigator:{onLine:true,serviceWorker:{controller:controlled?controller:null,register:async()=>reg,addEventListener:(key,fn)=>handlers[key]=fn}},
+    window:{addEventListener(){},matchMedia:()=>({matches:false}),setInterval(){},
+      setTimeout:(fn,delay)=>{timers.set(++timerId,{fn,delay});return timerId;},clearTimeout:id=>timers.delete(id)},
+    localStorage:{getItem:key=>storage.get(key)||null,setItem:(key,value)=>storage.set(key,value)},
+    location:{reload(){reloads++}}
   });
   vm.runInContext(source,context);await new Promise(resolve=>setImmediate(resolve));
-  handlers.controllerchange();assert.equal(reloads,0);assert.equal(button.hidden,false);
-  button.onclick();assert.equal(reloads,1);assert.equal(checks,1);
+  return {handlers,timers,nodes,reloads:()=>reloads};
+}
+
+test('Update notices disappear after five seconds, do not reload, and do not repeat the same version', async () => {
+  const source=await readFile(new URL('../sw.js',import.meta.url),'utf8');
+  const version=/const CACHE = '([^']+)'/.exec(source)[1];
+  const ui=await loadPwaNotice(new Map([['biomed-app-version',version]]));
+  assert.equal(ui.nodes.size,0);
+  ui.handlers.controllerchange();assert.equal(ui.reloads(),0);
+  ui.handlers.message({data:{type:'APP_VERSION',version}});assert.equal(ui.nodes.size,0);
+  ui.handlers.message({data:{type:'APP_VERSION',version:'biomed-pwa-v999'}});
+  const notice=ui.nodes.get('#appUpdateNotice');assert.equal(notice.hidden,false);
+  assert.match(notice.textContent,/Mise à jour prête/);
+  const timeout=[...ui.timers.values()][0];assert.equal(timeout.delay,5000);timeout.fn();
+  assert.equal(notice.hidden,true);
+  ui.handlers.message({data:{type:'APP_VERSION',version:'biomed-pwa-v999'}});
+  assert.equal(notice.hidden,true);assert.equal(ui.reloads(),0);
+});
+
+test('A loaded new version has one transient confirmation; a first installation has none', async () => {
+  const storage=new Map([['biomed-app-version','biomed-pwa-v1']]);
+  const first=await loadPwaNotice(storage);
+  assert.match(first.nodes.get('#appUpdateNotice').textContent,/Application mise à jour/);
+  [...first.timers.values()][0].fn();assert.equal(first.nodes.get('#appUpdateNotice').hidden,true);
+  assert.equal((await loadPwaNotice(storage)).nodes.size,0);
+  assert.equal((await loadPwaNotice(new Map(),false)).nodes.size,0);
 });

@@ -11,7 +11,7 @@ Interface hébergée sur GitHub Pages ; données et fonction email sur Appwrite 
 - Navigation et filtres restent accessibles pendant le défilement. Le bouton Haut permet de remonter rapidement.
 - Si plusieurs fiches partagent la référence, choisir explicitement l’article et son emplacement. Les nouvelles impressions QR utilisent `BIOID:<identifiant de fiche>` ; les anciennes références restent reconnues.
 - Le dernier stock consulté est enregistré sur cet appareil (sans contacts fournisseurs ni prix). Une première visite connectée et l’installation complète du service worker sont nécessaires pour consulter hors connexion. Aucune modification n’est mise en attente hors ligne.
-- Après un retour du réseau, actualiser le stock. Les nouvelles versions s’activent automatiquement et les pages se mettent à jour à la prochaine navigation ou ouverture en ligne. Une saisie en cours n’est pas rechargée automatiquement ; **Mettre à jour** permet de recharger après l’avoir terminée. Hors connexion, la page demandée est conservée en cache.
+- Après un retour du réseau, actualiser le stock. Les nouvelles versions s’activent automatiquement et les pages se mettent à jour à la prochaine navigation ou ouverture en ligne. Une saisie en cours n’est pas rechargée automatiquement. Hors connexion, la page demandée est conservée en cache.
 
 ## Alertes : diagnostic et déploiement
 
@@ -42,3 +42,9 @@ Si une exécution échoue sans message détaillé, consulter son journal dans Ap
 `node --test tests/stock.test.mjs`
 
 Tests avec services simulés : résultat d’envoi, erreurs Resend, destinataire serveur, échappement HTML, références ambiguës, pagination, cache hors ligne, fichiers PWA et sauvegarde du mouvement malgré un échec d’email/historique.
+
+## Notifications de mise à jour
+
+Un petit message non bloquant annonce la mise à jour disponible, puis confirme la nouvelle version réellement chargée. Il disparaît après cinq secondes, sans bouton et sans déplacer le focus. La confirmation apparaît une fois par version et navigateur. Le contrôle s’effectue à l’ouverture, au retour dans l’application et toutes les cinq minutes lorsqu’elle est visible. Aucune autorisation de notifications système n’est demandée.
+
+À chaque publication : incrémenter ensemble `APP_VERSION` dans `pwa.js` et `CACHE` dans `sw.js`, puis les versions des ressources modifiées dans les pages et le précache.

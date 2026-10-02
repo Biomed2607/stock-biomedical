@@ -1,6 +1,6 @@
-const CACHE = 'biomed-pwa-v5';
-const LOCAL_FILES = ['./', './index.html', './stock.html', './gestion-stock.html', './ajouter-consommable.html', './styles.css?v=93',
-  './index.js?v=93', './stock-utils.js', './pwa.js?v=94', './manifest.webmanifest',
+const CACHE = 'biomed-pwa-v6';
+const LOCAL_FILES = ['./', './index.html', './stock.html', './gestion-stock.html', './ajouter-consommable.html', './styles.css?v=95',
+  './index.js?v=93', './stock-utils.js', './pwa.js?v=95', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',
   './hopital_prive_drome_ardeche_logo.jpeg'];
 const CDN_FILES = ['https://cdn.jsdelivr.net/npm/appwrite@15.0.0/+esm',
@@ -33,7 +33,10 @@ self.addEventListener('activate', event => event.waitUntil((async () => {
   for (const key of await caches.keys()) if (key.startsWith('biomed-pwa-') && key !== CACHE) await caches.delete(key);
   await self.clients.claim();
 })()));
-self.addEventListener('message', event => { if (event.data?.type === 'SKIP_WAITING') self.skipWaiting(); });
+self.addEventListener('message', event => {
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
+  if (event.data?.type === 'GET_APP_VERSION') event.source?.postMessage({ type: 'APP_VERSION', version: CACHE });
+});
 self.addEventListener('fetch', event => {
   const request = event.request;
   if (request.method !== 'GET') return;

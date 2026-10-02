@@ -1252,3 +1252,7 @@ summary { cursor: pointer; font-weight: 700; }
   html { scroll-behavior: auto; }
   *, *::before, *::after { transition: none !important; }
 }
+
+/* Brief, non-blocking notice: no overlay, no focus change, no click interception. */
+.app-update-notice { position: fixed; z-index: 10000; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%); box-sizing: border-box; width: max-content; max-width: calc(100% - 32px); padding: 14px 20px; border-radius: 14px; color: #fff; background: #0f766e; box-shadow: 0 8px 28px rgba(6,54,74,.22); font-size: 1rem; line-height: 1.5; text-align: center; pointer-events: none; }
+.app-update-notice[hidden] { display: none; }
