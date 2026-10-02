@@ -6,7 +6,7 @@
 
   <title>Gestion du stock — Stock biomédical</title>
 
-  <link rel="stylesheet" href="styles.css?v=92" />
+  <link rel="stylesheet" href="styles.css?v=93" />
 
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   <meta name="theme-color" content="#0f766e" />
@@ -14,41 +14,64 @@
   <meta name="apple-mobile-web-app-title" content="Stock Bio" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-  <script src="pwa.js?v=92" defer></script>
+  <script src="pwa.js?v=93" defer></script>
 </head>
 
-<body>
-  <header class="site-header">
-    <div class="brand">
-      <img
-        src="hopital_prive_drome_ardeche_logo.jpeg"
-        alt="Hôpital privé Drôme Ardèche"
-        class="brand-logo"
-      />
-
-      <div>
-        <h1>Gestion du stock</h1>
-        <p>Création, modification, consultation et localisation des consommables biomédicaux</p>
+<body class="management-page">
+<header class="site-header"><div class="brand">
+    <img src="hopital_prive_drome_ardeche_logo.jpeg" alt="Hôpital privé Drôme Ardèche" class="brand-logo" />
+    <div><h1>Gestion de stock</h1><p>Quantités, états et consommables réunis dans une seule liste.</p></div>
+  </div></header>
+  <nav class="quick-nav" aria-label="Navigation principale"><a href="index.html">Accueil</a><a href="stock.html">Stock</a><a href="ajouter-consommable.html">Ajouter</a><a href="gestion-stock.html" aria-current="page">Gestion</a></nav>
+  <div class="app-toolbar"><span id="connectionStatus" role="status"></span>
+    <button id="updateAppBtn" class="btn secondary" type="button" hidden>Mettre à jour</button>
+  </div>
+<main class="container management-container">
+  <section aria-label="Consultation du stock">
+    <div class="management-controls">
+      <div class="management-actions">
+        <button id="showStockBtn" class="btn primary" type="button">Afficher le stock</button>
+        <button id="openVisualSearchBtn" class="btn secondary" type="button">Recherche visuelle</button>
+        <a class="btn secondary add-link" href="ajouter-consommable.html">+ Ajouter</a>
+      </div>
+      <div class="primary-filters">
+        <input id="searchInput" type="search" aria-label="Filtrer les articles" placeholder="Référence, désignation, emplacement…" />
+        <select id="statusFilter" aria-label="État du stock">
+          <option value="">Tous les états</option><option value="Rupture">Rupture</option>
+          <option value="Stock bas">Stock bas</option><option value="OK">OK</option>
+        </select>
+        <details class="extra-filters"><summary>Autres filtres</summary>
+          <div class="extra-filters-panel">
+            <label>Fournisseur<input id="supplierSearchInput" type="search" list="supplierOptions" /></label>
+            <label>Famille<input id="familyFilter" type="search" list="familyOptions" /></label>
+            <label>Type<input id="typeFilter" type="search" list="typeOptions" /></label>
+            <button id="resetFiltersBtn" class="btn secondary" type="button">Effacer les filtres</button>
+          </div>
+        </details>
+      </div>
+      <p id="stockSummary" class="stock-summary" role="status">Chargement…</p>
+    </div>
+    <p id="dataStatus" role="status">Chargement du stock…</p>
+    <p id="managementMessage" class="message" role="status"></p>
+    <datalist id="supplierOptions"></datalist><datalist id="familyOptions"></datalist><datalist id="typeOptions"></datalist>
+    <div id="stockListContainer" class="table-section">
+      <div class="table-wrapper unified-stock-wrapper">
+        <table class="unified-stock-table" aria-label="Stock et consommables">
+          <thead><tr><th>Article</th><th>Stock</th><th>État</th><th>Seuil</th><th>Emplacement</th><th>Fournisseur</th><th>Prix HT</th><th>Actions</th></tr></thead>
+          <tbody id="stockGestionTable"><tr><td colspan="8">Chargement des articles…</td></tr></tbody>
+        </table>
       </div>
     </div>
-
-    <nav>
-      <a href="index.html">Accueil</a>
-      <a href="stock.html">Stock</a>
-      <a href="gestion-stock.html">Gestion du stock</a>
-    </nav>
-  </header>
-  <div class="app-toolbar">
-    <span id="connectionStatus" role="status"></span>
-    <button id="installAppBtn" class="btn secondary" type="button">Installer l’application</button>
-    <button id="updateAppBtn" class="btn secondary" type="button" hidden>Mettre à jour</button>
-    <p id="installHelp" hidden>Sur iPhone/iPad : ouvrez ce site dans Safari, puis Partager → Sur l’écran d’accueil. Sur Android/PC : utilisez « Installer l’application » dans le menu du navigateur.</p>
-  </div>
-
-  <main class="container">
-    <section class="card">
-      <h2 id="formTitle">Ajouter un consommable</h2>
-
+    <details class="email-tools"><summary>Alertes email</summary>
+      <div class="actions"><button id="sendStockAlertBtn" class="btn warning" type="button">Envoyer alertes stock</button>
+      <button id="testEmailBtn" class="btn secondary" type="button">Tester l’email du pôle</button></div>
+      <p id="emailStatus" class="message" role="status" aria-live="polite"></p>
+    </details>
+  </section>
+</main>
+<dialog id="editDialog" class="edit-dialog" aria-labelledby="formTitle">
+  <div class="dialog-heading"><h2 id="formTitle">Modifier un consommable</h2>
+  <button id="closeEditBtn" class="btn secondary" type="button" aria-label="Fermer la modification">Fermer</button></div>
       <form id="itemForm" class="form-grid">
         <input type="hidden" id="itemId" />
         <input type="hidden" id="itemInternalCode" />
@@ -147,129 +170,7 @@
       </form>
 
       <p id="formMessage" class="message"></p>
-    </section>
-
-    <section class="card">
-      <div class="section-header">
-        <h2>Consultation</h2>
-        <p id="dataStatus" role="status">Chargement du stock…</p>
-
-        <div class="view-buttons">
-          <button id="showItemsBtn" class="btn secondary toggle-btn" type="button">
-            Afficher les consommables
-          </button>
-
-          <button id="showStockBtn" class="btn secondary toggle-btn" type="button">
-            Afficher le stock
-          </button>
-
-          <button id="openVisualSearchBtn" class="btn primary" type="button">
-            Recherche visuelle
-          </button>
-
-          <button id="sendStockAlertBtn" class="btn warning" type="button">
-            Envoyer alertes stock
-          </button>
-          <button id="testEmailBtn" class="btn secondary" type="button">Tester l’email du pôle</button>
-        </div>
-      </div>
-
-      <p id="emailStatus" class="message" role="status" aria-live="polite"></p>
-      <div class="list-tools">
-        <input id="searchInput" class="search" type="search" placeholder="Rechercher..." />
-
-        <input
-          id="supplierSearchInput"
-          class="search"
-          type="search"
-          list="supplierOptions"
-          placeholder="Filtrer par fournisseur..."
-        />
-
-        <input
-          id="familyFilter"
-          class="search"
-          type="search"
-          list="familyOptions"
-          placeholder="Filtrer par famille..."
-        />
-
-        <input
-          id="typeFilter"
-          class="search"
-          type="search"
-          list="typeOptions"
-          placeholder="Filtrer par type..."
-        />
-
-        <datalist id="supplierOptions"></datalist>
-        <datalist id="familyOptions"></datalist>
-        <datalist id="typeOptions"></datalist>
-      </div>
-
-      <div id="itemsListContainer" class="hidden table-section">
-        <h2>Liste des consommables</h2>
-
-        <div class="table-wrapper">
-          <table>
-            <thead>
-              <tr>
-                <th>Référence</th>
-                <th>Désignation</th>
-                <th>Famille</th>
-                <th>Type</th>
-                <th>Catégorie</th>
-                <th>Emplacement</th>
-                <th>Seuil</th>
-                <th>Fournisseur</th>
-                <th>Email</th>
-                <th>Prix HT</th>
-                <th>QR code</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-
-            <tbody id="itemsTable">
-              <tr>
-                <td colspan="12">Cliquez sur “Afficher les consommables”.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div id="stockListContainer" class="hidden table-section">
-        <h2>État du stock</h2>
-
-        <div class="table-wrapper">
-          <table>
-            <thead>
-              <tr>
-                <th>Stock</th>
-                <th>Statut</th>
-                <th>Référence</th>
-                <th>Désignation</th>
-                <th>Famille</th>
-                <th>Type</th>
-                <th>Seuil</th>
-                <th>Emplacement</th>
-                <th>Fournisseur</th>
-                <th>Email</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-
-            <tbody id="stockGestionTable">
-              <tr>
-                <td colspan="11">Cliquez sur “Afficher le stock”.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-  </main>
-
+</dialog>
   <div id="locationModal" class="location-modal hidden" aria-hidden="true">
     <div class="location-modal-card">
       <button id="closeLocationModal" class="location-close-btn" type="button">×</button>
@@ -338,6 +239,6 @@
     </div>
   </div>
 
-  <script type="module" src="index.js?v=92"></script>
-</body>
-</html>
+<button id="backToTopBtn" class="back-to-top" type="button" hidden aria-label="Revenir en haut de la page">↑ Haut</button>
+  <script type="module" src="index.js?v=93"></script>
+</body></html>

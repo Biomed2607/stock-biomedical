@@ -733,7 +733,7 @@ function initStockPage() {
     } catch (error) {
       console.error(error);
       qrReader.classList.remove('active');
-      showNotification('Caméra indisponible ou accès refusé. Saisissez la référence ci-dessus puis appuyez sur Rechercher.', 'warning');
+      showNotification('Caméra indisponible ou accès refusé. Saisissez la référence ci-dessus puis appuyez sur Scanner.', 'warning');
       scannerRunning = false;
       lastScannedValue = '';
       qrSearch.focus();
@@ -786,14 +786,16 @@ function initStockPage() {
     handleCode(qrSearch.value, false);
   });
 
-  document.querySelector('#searchRefBtn').addEventListener('click', () => handleCode(qrSearch.value));
   document.querySelector('#refreshStockBtn').addEventListener('click', async () => {
     if (movementBusy) return;
     clearSelectedItem();
     matchChoices.replaceChildren();
     await loadItems();
   });
-  startScannerBtn?.addEventListener('click', startScanner);
+  startScannerBtn?.addEventListener('click', () => {
+    if (qrSearch.value.trim()) return handleCode(qrSearch.value, scannerRunning);
+    return startScanner();
+  });
   stopScannerBtn?.addEventListener('click', () => stopScanner(true));
 
   addStockBtn.addEventListener('click', addPendingStock);
@@ -815,7 +817,6 @@ function initStockPage() {
 
 function initGestionPage() {
   const form = document.querySelector('#itemForm');
-  const table = document.querySelector('#itemsTable');
   const stockGestionTable = document.querySelector('#stockGestionTable');
 
   const message = document.querySelector('#formMessage');
@@ -834,7 +835,6 @@ function initGestionPage() {
   const formFamilyOptions = document.querySelector('#formFamilyOptions');
   const formTypeOptions = document.querySelector('#formTypeOptions');
 
-  const showItemsBtn = document.querySelector('#showItemsBtn');
   const showStockBtn = document.querySelector('#showStockBtn');
   const sendStockAlertBtn = document.querySelector('#sendStockAlertBtn');
 
@@ -853,13 +853,14 @@ function initGestionPage() {
   const rackTitle = document.querySelector('#rackTitle');
   const rackHint = document.querySelector('#rackHint');
 
-  const itemsListContainer = document.querySelector('#itemsListContainer');
   const stockListContainer = document.querySelector('#stockListContainer');
 
   if (!form) return;
 
   let itemsCache = [];
-  let activeView = '';
+  const editDialog = document.querySelector('#editDialog');
+  const statusFilter = document.querySelector('#statusFilter');
+  const managementMessage = document.querySelector('#managementMessage');
 
   function fillDatalist(element, values) {
     if (!element) return;
@@ -1064,10 +1065,8 @@ function initGestionPage() {
     document.querySelector('#email').value = getSupplierEmail(item);
     document.querySelector('#notes').value = '';
 
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth'
-    });
+    if (editDialog && !editDialog.open) editDialog.showModal();
+    document.querySelector('#reference').focus();
   }
 
   async function loadItems() {
@@ -1106,134 +1105,61 @@ function initGestionPage() {
         !typeValue ||
         String(item.consumableType || '').toLowerCase().includes(typeValue);
 
-      return matchesSearch && matchesSupplier && matchesFamily && matchesType;
+      const matchesStatus = !statusFilter?.value || getStatus(item).label === statusFilter.value;
+      return matchesSearch && matchesSupplier && matchesFamily && matchesType && matchesStatus;
     });
-  }
-
-  function renderItemsTable() {
-    if (!table) return;
-
-    const filtered = getFilteredItems();
-
-    if (!filtered.length) {
-      table.innerHTML = '<tr><td colspan="12">Aucun consommable trouvé.</td></tr>';
-      return;
-    }
-
-    table.innerHTML = filtered.map(item => `
-      <tr>
-        <td>${escapeHtml(item.itemCode || '')}</td>
-        <td>${escapeHtml(item.itemName || '')}</td>
-        <td>${escapeHtml(item.equipmentFamily || '')}</td>
-        <td>${escapeHtml(item.consumableType || '')}</td>
-        <td>${escapeHtml(item.category || '')}</td>
-        <td>${escapeHtml(item.storageLocation || '')}</td>
-        <td>${safeNumber(item.alertThreshold)}</td>
-        <td>${escapeHtml(item.supplierName || '')}</td>
-        <td>${escapeHtml(getSupplierEmail(item))}</td>
-        <td>${euro(item.unitPrice)}</td>
-        <td>
-          ${
-            item.barcodeValue
-              ? `<div class="qr-cell" data-qr-value="${escapeHtml(`BIOID:${item.$id}`)}"></div>`
-              : '<span>À générer</span>'
-          }
-        </td>
-        <td class="row-actions">
-          <button class="btn locate" type="button" data-locate="${item.$id}">Localiser</button>
-          <button class="btn secondary" type="button" data-edit="${item.$id}">Modifier</button>
-          <button class="btn warning" type="button" data-print="${item.$id}">Imprimer QR</button>
-          <button class="btn danger" type="button" data-delete="${item.$id}">Supprimer</button>
-        </td>
-      </tr>
-    `).join('');
-
-    renderAllQrCodes();
   }
 
   function renderStockTable() {
     if (!stockGestionTable) return;
-
-    const filtered = getFilteredItems();
-
-    const sortedItems = [...filtered].sort((a, b) => {
-      const statusPriority = statusRank(getStatus(a).label) - statusRank(getStatus(b).label);
-
-      if (statusPriority !== 0) return statusPriority;
-
-      return safeNumber(a.stockQuantity) - safeNumber(b.stockQuantity);
-    });
-
+    const sortedItems = getFilteredItems().sort((a, b) =>
+      statusRank(getStatus(a).label) - statusRank(getStatus(b).label) ||
+      safeNumber(a.stockQuantity) - safeNumber(b.stockQuantity));
+    const ruptureCount = itemsCache.filter(item => getStatus(item).label === 'Rupture').length;
+    const lowCount = itemsCache.filter(item => getStatus(item).label === 'Stock bas').length;
+    document.querySelector('#stockSummary').textContent = `${sortedItems.length} / ${itemsCache.length} articles · ${ruptureCount} en rupture · ${lowCount} en stock bas`;
     if (!sortedItems.length) {
-      stockGestionTable.innerHTML = '<tr><td colspan="11">Aucun stock trouvé.</td></tr>';
+      stockGestionTable.innerHTML = '<tr><td colspan="8" class="empty-stock">Aucun article ne correspond aux filtres.</td></tr>';
       return;
     }
-
     stockGestionTable.innerHTML = sortedItems.map(item => {
       const status = getStatus(item);
-
-      return `
-        <tr>
-          <td><strong>${safeNumber(item.stockQuantity)}</strong></td>
-          <td><span class="status ${status.className}">${status.label}</span></td>
-          <td>${escapeHtml(item.itemCode || '')}</td>
-          <td>${escapeHtml(item.itemName || '')}</td>
-          <td>${escapeHtml(item.equipmentFamily || '')}</td>
-          <td>${escapeHtml(item.consumableType || '')}</td>
-          <td>${safeNumber(item.alertThreshold)}</td>
-          <td>${escapeHtml(item.storageLocation || '')}</td>
-          <td>${escapeHtml(item.supplierName || '')}</td>
-          <td>${escapeHtml(getSupplierEmail(item))}</td>
-          <td>
-            <button class="btn locate" type="button" data-locate="${item.$id}">Localiser</button>
-          </td>
-        </tr>
-      `;
+      const id = escapeHtml(item.$id);
+      return `<tr>
+        <td data-label="Article" class="article-cell"><strong>${escapeHtml(item.itemCode || '')}</strong>
+          <span>${escapeHtml(item.itemName || '')}</span>
+          <small>${escapeHtml([item.equipmentFamily, item.consumableType, item.category].filter(Boolean).join(' · '))}</small></td>
+        <td data-label="Stock"><strong>${safeNumber(item.stockQuantity)}</strong></td>
+        <td data-label="État"><span class="status ${status.className}">${status.label}</span></td>
+        <td data-label="Seuil">${safeNumber(item.alertThreshold)}</td>
+        <td data-label="Emplacement">${escapeHtml(item.storageLocation || '—')}</td>
+        <td data-label="Fournisseur" class="supplier-cell">${escapeHtml(item.supplierName || '—')}<small>${escapeHtml(getSupplierEmail(item))}</small></td>
+        <td data-label="Prix HT">${usingSnapshot ? '—' : euro(item.unitPrice)}</td>
+        <td data-label="Actions" class="stock-actions-cell"><div class="row-actions">
+          <button class="btn locate" type="button" data-locate="${id}">Localiser</button>
+          <button class="btn secondary" type="button" data-edit="${id}">Modifier</button>
+          <button class="btn warning" type="button" data-print="${id}">Imprimer QR</button>
+          <button class="btn danger" type="button" data-delete="${id}">Supprimer</button>
+        </div></td>
+      </tr>`;
     }).join('');
   }
 
-  async function showItemsView() {
-    activeView = 'items';
-
-    itemsListContainer?.classList.remove('hidden');
-    stockListContainer?.classList.add('hidden');
-
-    showItemsBtn?.classList.add('primary');
-    showItemsBtn?.classList.remove('secondary');
-
-    showStockBtn?.classList.remove('primary');
-    showStockBtn?.classList.add('secondary');
-
-    await loadItems();
-    renderItemsTable();
-  }
-
   async function showStockView() {
-    activeView = 'stock';
-
-    stockListContainer?.classList.remove('hidden');
-    itemsListContainer?.classList.add('hidden');
-
-    showStockBtn?.classList.add('primary');
-    showStockBtn?.classList.remove('secondary');
-
-    showItemsBtn?.classList.remove('primary');
-    showItemsBtn?.classList.add('secondary');
-
-    await loadItems();
-    renderStockTable();
+    if (!showStockBtn || showStockBtn.disabled) return;
+    showStockBtn.disabled = true;
+    try {
+      await loadItems();
+      renderStockTable();
+      managementMessage.textContent = '';
+    } catch (error) {
+      managementMessage.textContent = `Chargement impossible : ${error.message}`;
+      managementMessage.className = 'message error';
+    } finally { showStockBtn.disabled = false; }
   }
 
   function refreshActiveView() {
-    updateFilterOptions();
-
-    if (activeView === 'items') {
-      renderItemsTable();
-    }
-
-    if (activeView === 'stock') {
-      renderStockTable();
-    }
+    renderStockTable();
   }
 
   const emailStatus = document.querySelector('#emailStatus');
@@ -1269,7 +1195,7 @@ function initGestionPage() {
     finally { sendStockAlertBtn.disabled = false; }
   }
 
-  document.querySelector('#testEmailBtn').addEventListener('click', async event => {
+  document.querySelector('#testEmailBtn')?.addEventListener('click', async event => {
     const button = event.currentTarget;
     if (button.disabled) return;
     try {
@@ -1371,12 +1297,13 @@ function initGestionPage() {
         );
       }
 
-      message.textContent = 'Consommable enregistré avec succès. QR code individuel disponible.';
-      message.classList.add('success');
-
       clearForm();
-      await loadItems();
-      refreshActiveView();
+      if (editDialog) editDialog.close();
+      const resultMessage = managementMessage || message;
+      resultMessage.textContent = 'Consommable enregistré avec succès. QR code individuel disponible.';
+      resultMessage.className = 'message success';
+      try { await loadItems(); refreshActiveView(); }
+      catch (error) { resultMessage.textContent += ' Actualisez la page pour recharger la liste.'; }
 
     } catch (error) {
       console.error(error);
@@ -1385,7 +1312,7 @@ function initGestionPage() {
     }
   });
 
-  table?.addEventListener('click', async event => {
+  stockGestionTable?.addEventListener('click', async event => {
     const locateId = event.target.dataset.locate;
     const editId = event.target.dataset.edit;
     const printId = event.target.dataset.print;
@@ -1398,7 +1325,8 @@ function initGestionPage() {
 
     if (editId) {
       const item = itemsCache.find(doc => doc.$id === editId);
-      if (item) fillForm(item);
+      try { requireOnline(); if (item) fillForm(item); }
+      catch (error) { managementMessage.textContent = error.message; }
     }
 
     if (printId) {
@@ -1428,23 +1356,23 @@ function initGestionPage() {
     }
   });
 
-  stockGestionTable?.addEventListener('click', event => {
-    const locateId = event.target.dataset.locate;
-
-    if (locateId) {
-      const item = itemsCache.find(doc => doc.$id === locateId);
-      if (item) openLocationModal(item);
-    }
+  resetBtn?.addEventListener('click', () => {
+    const id = document.querySelector('#itemId').value;
+    const item = itemsCache.find(item => item.$id === id);
+    if (item && editDialog) fillForm(item); else clearForm();
   });
-
-  resetBtn?.addEventListener('click', clearForm);
+  document.querySelector('#closeEditBtn')?.addEventListener('click', () => editDialog.close());
+  statusFilter?.addEventListener('change', refreshActiveView);
+  document.querySelector('#resetFiltersBtn')?.addEventListener('click', () => {
+    [searchInput, supplierSearchInput, familyFilter, typeFilter, statusFilter].forEach(el => { if (el) el.value = ''; });
+    refreshActiveView();
+  });
 
   searchInput?.addEventListener('input', refreshActiveView);
   supplierSearchInput?.addEventListener('input', refreshActiveView);
   familyFilter?.addEventListener('input', refreshActiveView);
   typeFilter?.addEventListener('input', refreshActiveView);
 
-  showItemsBtn?.addEventListener('click', showItemsView);
   showStockBtn?.addEventListener('click', showStockView);
   sendStockAlertBtn?.addEventListener('click', sendManualStockAlerts);
 
@@ -1475,9 +1403,10 @@ function initGestionPage() {
     }
   });
 
-  loadItems().catch(error => {
-    message.textContent = `Chargement impossible : ${error.message}`;
-    message.className = 'message error';
+  loadItems().then(refreshActiveView).catch(error => {
+    const target = managementMessage || message;
+    target.textContent = `Chargement impossible : ${error.message}`;
+    target.className = 'message error';
   });
 }
 
