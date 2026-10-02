@@ -14,10 +14,10 @@ window.addEventListener('online', () => {
 });
 window.addEventListener('offline', updateConnection);
 window.addEventListener('beforeinstallprompt', event => {
-  event.preventDefault(); installPrompt = event; installButton.hidden = false;
+  event.preventDefault(); installPrompt = event; if (installButton) installButton.hidden = false;
 });
-window.addEventListener('appinstalled', () => { installButton.hidden = true; installPrompt = null; });
-installButton.addEventListener('click', async () => {
+window.addEventListener('appinstalled', () => { if (installButton) installButton.hidden = true; installPrompt = null; });
+installButton?.addEventListener('click', async () => {
   if (installPrompt) {
     await installPrompt.prompt(); await installPrompt.userChoice; installPrompt = null;
   } else {
@@ -25,7 +25,7 @@ installButton.addEventListener('click', async () => {
     help.hidden = !help.hidden;
   }
 });
-if (window.matchMedia('(display-mode: standalone)').matches || navigator.standalone) installButton.hidden = true;
+if (window.matchMedia('(display-mode: standalone)').matches || navigator.standalone) if (installButton) installButton.hidden = true;
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(reg => {
     function offerUpdate() {
@@ -45,6 +45,17 @@ if ('serviceWorker' in navigator) {
       if (!document.querySelector('#updateAppBtn').hidden) { reloading = true; location.reload(); }
     });
   }).catch(() => {
-    document.querySelector('#installHelp').textContent = 'Le mode hors connexion n’est pas disponible dans ce navigateur. Le site reste utilisable en ligne.';
+    const help = document.querySelector('#installHelp');
+    if (help) help.textContent = 'Le mode hors connexion n’est pas disponible dans ce navigateur. Le site reste utilisable en ligne.';
   });
+}
+
+const backToTop = document.querySelector('#backToTopBtn');
+if (backToTop) {
+  const updateScrollButton = () => { backToTop.hidden = window.scrollY < 240; };
+  window.addEventListener('scroll', updateScrollButton, { passive: true });
+  updateScrollButton();
+  backToTop.addEventListener('click', () => window.scrollTo({
+    top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
+  }));
 }

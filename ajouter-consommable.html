@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Ajouter un consommable — Stock biomédical</title>
+
+  <link rel="stylesheet" href="styles.css?v=93" />
+
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <meta name="theme-color" content="#0f766e" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Stock Bio" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <script src="pwa.js?v=93" defer></script>
+</head>
+
+<body class="add-page">
+<header class="site-header"><div class="brand">
+    <img src="hopital_prive_drome_ardeche_logo.jpeg" alt="Hôpital privé Drôme Ardèche" class="brand-logo" />
+    <div><h1>Ajouter un consommable</h1><p>Créer une fiche et préparer son QR code.</p></div>
+  </div></header>
+  <nav class="quick-nav" aria-label="Navigation principale"><a href="index.html">Accueil</a><a href="stock.html">Stock</a><a href="ajouter-consommable.html" aria-current="page">Ajouter</a><a href="gestion-stock.html">Gestion</a></nav>
+  <div class="app-toolbar"><span id="connectionStatus" role="status"></span>
+    <button id="updateAppBtn" class="btn secondary" type="button" hidden>Mettre à jour</button>
+  </div>
+<main class="container form-page"><section class="card">
+  <h2 id="formTitle">Ajouter un consommable</h2>
+      <form id="itemForm" class="form-grid">
+        <input type="hidden" id="itemId" />
+        <input type="hidden" id="itemInternalCode" />
+        <input type="hidden" id="itemQrValue" />
+
+        <label>
+          Référence
+          <input id="reference" type="text" placeholder="Ex : 1175BF" required />
+        </label>
+
+        <label>
+          Désignation
+          <input id="designation" type="text" placeholder="Ex : XENON" required />
+        </label>
+
+        <label>
+          Famille / équipement
+          <input
+            id="equipmentFamily"
+            type="text"
+            placeholder="Ex : Moniteur, Respirateur, Bistouri..."
+            list="formFamilyOptions"
+            required
+          />
+        </label>
+
+        <label>
+          Type de consommable
+          <input
+            id="consumableType"
+            type="text"
+            placeholder="Ex : Xénon, câble, capteur..."
+            list="formTypeOptions"
+            required
+          />
+        </label>
+
+        <label>
+          Catégorie
+          <select id="category" required>
+            <option value="Consommable">Consommable</option>
+            <option value="Pièce détachée">Pièce détachée</option>
+            <option value="Autre">Autre</option>
+          </select>
+        </label>
+
+        <label>
+          Prix avec ou sans remise HT
+          <input id="price" type="number" min="0" step="0.01" value="0" required />
+        </label>
+
+        <label>
+          Seuil d’alerte
+          <input id="alertThreshold" type="number" min="0" value="0" required />
+        </label>
+
+        <label>
+          Emplacement
+          <input id="storageLocation" type="text" placeholder="Ex : Rayon 1 - Étagère 2" required />
+        </label>
+
+        <label>
+          Fournisseur
+          <input
+            id="supplier"
+            type="text"
+            placeholder="Ex : Biomedisyst"
+            list="formSupplierOptions"
+            required
+          />
+        </label>
+
+        <label>
+          Contact fournisseur
+          <input id="contact" type="text" placeholder="Ex : Service commercial" />
+        </label>
+
+        <label>
+          Email fournisseur
+          <input id="email" type="email" placeholder="commandes@fournisseur.fr" required />
+        </label>
+
+        <label class="full">
+          Notes
+          <textarea id="notes" rows="3" placeholder="Informations complémentaires"></textarea>
+        </label>
+
+        <datalist id="formSupplierOptions"></datalist>
+        <datalist id="formFamilyOptions"></datalist>
+        <datalist id="formTypeOptions"></datalist>
+
+        <div class="form-actions full">
+          <button class="btn primary" type="submit">Enregistrer le consommable</button>
+          <button id="resetBtn" class="btn secondary" type="button">Réinitialiser</button>
+        </div>
+      </form>
+
+      <p id="formMessage" class="message"></p>
+</section><a class="btn secondary" href="gestion-stock.html">Consulter le stock</a></main><button id="backToTopBtn" class="back-to-top" type="button" hidden aria-label="Revenir en haut de la page">↑ Haut</button>
+  <script type="module" src="index.js?v=93"></script>
+</body></html>

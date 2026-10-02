@@ -6,44 +6,25 @@
 
   <title>Stock — Stock biomédical</title>
 
-  <link rel="stylesheet" href="styles.css?v=92" />
+  <link rel="stylesheet" href="styles.css?v=93" />
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <meta name="theme-color" content="#0f766e" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Stock Bio" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-  <script src="pwa.js?v=92" defer></script>
+  <script src="pwa.js?v=93" defer></script>
 </head>
 
 <body class="stock-only-body">
-  <header class="site-header stock-centered-header">
-    <div class="brand">
-      <img
-        src="hopital_prive_drome_ardeche_logo.jpeg"
-        alt="Hôpital privé Drôme Ardèche"
-        class="brand-logo"
-      />
-
-      <div>
-        <h1>Stock</h1>
-        <p>Scannez un QR code puis ajoutez ou retirez du stock</p>
-      </div>
-    </div>
-
-    <nav>
-      <a href="index.html">Accueil</a>
-      <a href="stock.html">Stock</a>
-      <a href="gestion-stock.html">Gestion du stock</a>
-    </nav>
-  </header>
-  <div class="app-toolbar">
-    <span id="connectionStatus" role="status"></span>
-    <button id="installAppBtn" class="btn secondary" type="button">Installer l’application</button>
+<header class="site-header"><div class="brand">
+    <img src="hopital_prive_drome_ardeche_logo.jpeg" alt="Hôpital privé Drôme Ardèche" class="brand-logo" />
+    <div><h1>Stock</h1><p>Scanner ou saisir une référence, puis enregistrer le mouvement.</p></div>
+  </div></header>
+  <nav class="quick-nav" aria-label="Navigation principale"><a href="index.html">Accueil</a><a href="stock.html" aria-current="page">Stock</a><a href="ajouter-consommable.html">Ajouter</a><a href="gestion-stock.html">Gestion</a></nav>
+  <div class="app-toolbar"><span id="connectionStatus" role="status"></span>
     <button id="updateAppBtn" class="btn secondary" type="button" hidden>Mettre à jour</button>
-    <p id="installHelp" hidden>Sur iPhone/iPad : ouvrez ce site dans Safari, puis Partager → Sur l’écran d’accueil. Sur Android/PC : utilisez « Installer l’application » dans le menu du navigateur.</p>
   </div>
-
   <main class="stock-page">
     <section class="stock-terminal">
       <div class="stock-terminal-header">
@@ -66,14 +47,12 @@
           />
           <span class="scan-input-icon">📷</span>
         </div>
-
-        <button id="searchRefBtn" class="btn primary" type="button">Rechercher</button>
         </div>
-        <p class="scan-help">Saisissez la référence puis Rechercher, ou utilisez la caméra.</p>
+        <p class="scan-help">Référence saisie : Scanner la valide. Champ vide : Scanner ouvre la caméra.</p>
         <div id="matchChoices" aria-live="polite"></div>
         <div class="camera-row">
           <button id="startScannerBtn" class="camera-main-btn" type="button">
-            📸 Scanner un QR code
+            📸 Scanner
           </button>
 
           <button id="stopScannerBtn" class="camera-main-btn danger" type="button">
@@ -114,6 +93,7 @@
     </section>
   </main>
 
-  <script type="module" src="index.js?v=92"></script>
+<button id="backToTopBtn" class="back-to-top" type="button" hidden aria-label="Revenir en haut de la page">↑ Haut</button>
+  <script type="module" src="index.js?v=93"></script>
 </body>
 </html>

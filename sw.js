@@ -1,6 +1,6 @@
-const CACHE = 'biomed-pwa-v1';
-const LOCAL_FILES = ['./', './index.html', './stock.html', './gestion-stock.html', './styles.css?v=92',
-  './index.js?v=92', './stock-utils.js', './pwa.js?v=92', './manifest.webmanifest',
+const CACHE = 'biomed-pwa-v2';
+const LOCAL_FILES = ['./', './index.html', './stock.html', './gestion-stock.html', './ajouter-consommable.html', './styles.css?v=93',
+  './index.js?v=93', './stock-utils.js', './pwa.js?v=93', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',
   './hopital_prive_drome_ardeche_logo.jpeg'];
 const CDN_FILES = ['https://cdn.jsdelivr.net/npm/appwrite@15.0.0/+esm',

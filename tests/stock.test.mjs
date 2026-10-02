@@ -66,7 +66,7 @@ test('Pagination loads beyond 100 and offline snapshot excludes contacts', async
 
 test('PWA precache includes every local file and application path stays within repository', async () => {
   const manifest=JSON.parse(await readFile(new URL('../manifest.webmanifest',import.meta.url),'utf8'));
-  assert.equal(manifest.start_url,'./stock.html');assert.equal(manifest.scope,'./');
+  assert.equal(manifest.start_url,'./index.html');assert.equal(manifest.scope,'./');
   const source=await readFile(new URL('../sw.js',import.meta.url),'utf8');
   const files=vm.runInNewContext(source.slice(0,source.indexOf('self.addEventListener'))+'LOCAL_FILES');
   for(const file of files) if(file!=='./' && !file.includes('hopital_')) await readFile(new URL('../'+file.split('?')[0],import.meta.url));
@@ -83,7 +83,7 @@ test('A failed email or history write cannot repeat an already saved stock movem
   class Functions {async createExecution(){sends++;return {status:'completed',responseStatusCode:500,responseBody:'{"ok":false,"message":"RESEND_API_KEY manquante."}'}}}
   const context=vm.createContext({Client,Databases,Functions,ID:{unique:()=> 'id'},Query:{orderAsc:x=>x,limit:x=>x},navigator:{onLine:true},document:{body:{classList:{toggle(){}}},querySelector:id=>elements.get(id)||null},localStorage:{setItem(){},getItem(){return null}},window:{},console,inspectAlertExecution,findMatchingItems,describeAlertError: x=>x});
   vm.runInContext(source,context);await new Promise(resolve=>setImmediate(resolve));
-  elements.get('#qrSearch').value='REF1';await elements.get('#searchRefBtn').listeners.click();
+  elements.get('#qrSearch').value='REF1';await elements.get('#startScannerBtn').listeners.click();
   elements.get('#removeStockBtn').listeners.click();
   await elements.get('#validateStockBtn').listeners.click();
   assert.equal(writes,1);assert.equal(doc.stockQuantity,1);assert.equal(sends,1);
@@ -91,4 +91,34 @@ test('A failed email or history write cannot repeat an already saved stock movem
   assert.match(elements.get('#alertResult').textContent,/non confirmée/);
   assert.equal(elements.get('#retryAlertBtn').hidden,false);
   await elements.get('#validateStockBtn').listeners.click();assert.equal(writes,1);
+});
+
+test('Installation is exclusive to home; all three destinations and one stock table exist', async () => {
+  const home=await readFile(new URL('../index.html',import.meta.url),'utf8');
+  assert.match(home,/id="installAppBtn"/);
+  for(const page of ['stock.html','ajouter-consommable.html','gestion-stock.html']) {
+    assert.ok(home.includes(`href="${page}"`));
+    const html=await readFile(new URL('../'+page,import.meta.url),'utf8');
+    assert.ok(!html.includes('id="installAppBtn"'));
+    assert.ok(!html.includes('id="installHelp"'));
+    assert.ok(html.includes('class="quick-nav"'));
+    assert.ok(html.includes('id="backToTopBtn"'));
+  }
+  const management=await readFile(new URL('../gestion-stock.html',import.meta.url),'utf8');
+  assert.equal((management.match(/<table\b/g)||[]).length,1);
+  assert.ok(!management.includes('id="showItemsBtn"'));
+  assert.match(management,/<dialog id="editDialog"/);
+  const stock=await readFile(new URL('../stock.html',import.meta.url),'utf8');
+  assert.ok(!stock.includes('id="searchRefBtn"'));
+});
+
+test('PWA script works on pages without installation controls', async () => {
+  const source=await readFile(new URL('../pwa.js',import.meta.url),'utf8');
+  const handlers={};const label={textContent:'',classList:{toggle(){}}};
+  const context=vm.createContext({document:{querySelector:id=>id==='#connectionStatus'?label:null,body:{classList:{toggle(){}}}},navigator:{onLine:true},window:{addEventListener:(key,handler)=>handlers[key]=handler,matchMedia:()=>({matches:false})}});
+  vm.runInContext(source,context);
+  assert.equal(label.textContent,'En ligne');
+  handlers.beforeinstallprompt({preventDefault(){}});
+  handlers.appinstalled();
+  context.navigator.onLine=false;handlers.offline();assert.match(label.textContent,/Hors connexion/);
 });

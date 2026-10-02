@@ -4,8 +4,11 @@ Interface hébergée sur GitHub Pages ; données et fonction email sur Appwrite 
 
 ## Utilisation
 
-- Installer depuis le bouton de l’application ou le menu du navigateur. Sur iPhone : Safari → Partager → Sur l’écran d’accueil.
-- L’application installée ouvre directement `stock.html`. Scanner un QR code ou saisir une référence puis **Rechercher**.
+- Installer depuis le bouton de la page d’accueil ou le menu du navigateur. Sur iPhone : Safari → Partager → Sur l’écran d’accueil.
+- L’application installée ouvre `index.html`, avec trois accès : **Stock**, **Ajouter un consommable**, **Gestion de stock**.
+- Dans Stock, **Scanner** valide la référence si elle est renseignée ; sinon il ouvre la caméra. La touche Entrée valide aussi la référence.
+- La gestion affiche un tableau unique (fiches sur mobile) avec état, quantité, seuil, fournisseur, prix et actions Modifier / Supprimer / Localiser / Imprimer QR. La modification s’ouvre dans une fenêtre sans quitter la liste.
+- Navigation et filtres restent accessibles pendant le défilement. Le bouton Haut permet de remonter rapidement.
 - Si plusieurs fiches partagent la référence, choisir explicitement l’article et son emplacement. Les nouvelles impressions QR utilisent `BIOID:<identifiant de fiche>` ; les anciennes références restent reconnues.
 - Le dernier stock consulté est enregistré sur cet appareil (sans contacts fournisseurs ni prix). Une première visite connectée et l’installation complète du service worker sont nécessaires pour consulter hors connexion. Aucune modification n’est mise en attente hors ligne.
 - Après un retour du réseau, actualiser le stock. Les mises à jour de l’application s’appliquent avec le bouton **Mettre à jour**, après avoir terminé le mouvement en cours.
