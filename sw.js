@@ -1,4 +1,4 @@
-const CACHE = 'biomed-pwa-v4';
+const CACHE = 'biomed-pwa-v5';
 const LOCAL_FILES = ['./', './index.html', './stock.html', './gestion-stock.html', './ajouter-consommable.html', './styles.css?v=93',
   './index.js?v=93', './stock-utils.js', './pwa.js?v=94', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',
